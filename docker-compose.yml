@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ns-postgres
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_PASSWORD: neuralsync
+      POSTGRES_USER: neuralsync
+      POSTGRES_DB: neuralsync
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U neuralsync"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ns-qdrant
+    ports: ["6333:6333","6334:6334"]
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD","/qdrant/healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: ns-neo4j
+    ports: ["7474:7474","7687:7687"]
+    environment:
+      NEO4J_AUTH: neo4j/neuralsync
+      NEO4J_server_memory_pagecache_size: 512M
+      NEO4J_server_memory_heap_initial__size: 512M
+      NEO4J_server_memory_heap_max__size: 1G
+    volumes:
+      - ./data/neo4j:/data
+    healthcheck:
+      test: ["CMD-SHELL","cypher-shell -u neo4j -p neuralsync 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  redpanda:
+    image: redpanda/redpanda:latest
+    container_name: ns-redpanda
+    command:
+      - redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --check=false
+    ports: ["9092:9092","9644:9644"]
+    healthcheck:
+      test: ["CMD","curl","-fsS","http://localhost:9644/v1/status/ready"]
+      interval: 10s
+      timeout: 5s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: ns-minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000","9001:9001"]
+    environment:
+      MINIO_ROOT_USER: neuralsync
+      MINIO_ROOT_PASSWORD: neuralsync123!
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD","curl","-f","http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: ns-jaeger
+    ports: ["16686:16686","14268:14268","6831:6831/udp"]
+
+  api:
+    image: python:3.11-slim
+    container_name: ns-api
+    working_dir: /app
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NS_QDRANT_URL: http://qdrant:6333
+      NS_POSTGRES_URL: postgresql://neuralsync:neuralsync@postgres:5432/neuralsync
+      NS_NEO4J_URL: bolt://neo4j:7687
+      NS_NEO4J_USER: neo4j
+      NS_NEO4J_PASS: neuralsync
+      NS_MINIO_URL: http://minio:9000
+      NS_MINIO_KEY: neuralsync
+      NS_MINIO_SECRET: neuralsync123!
+      NS_EVENT_LOG: /app/volume/events.jsonl
+      NEURALSYNC_API_TOKEN: ${NEURALSYNC_API_TOKEN}
+    volumes:
+      - ./services/api:/app
+      - ./data/api:/app/volume
+    depends_on: [postgres,qdrant,neo4j,minio]
+    command: bash -lc "pip install --no-cache-dir fastapi uvicorn[standard] pydantic qdrant-client psycopg[binary] py2neo openai tiktoken python-jose[cryptography] && uvicorn main:app --host 0.0.0.0 --port 8080"
+    ports: ["8080:8080"]
+
+  worker:
+    image: python:3.11-slim
+    container_name: ns-worker
+    working_dir: /app
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NS_QDRANT_URL: http://qdrant:6333
+      NS_NEO4J_URL: bolt://neo4j:7687
+      NS_NEO4J_USER: neo4j
+      NS_NEO4J_PASS: neuralsync
+      NS_EVENT_LOG: /app/volume/events.jsonl
+    volumes:
+      - ./services/worker:/app
+      - ./data/api:/app/volume
+    depends_on: [qdrant,neo4j,api]
+    command: bash -lc "pip install --no-cache-dir qdrant-client py2neo openai tiktoken watchdog && python extractor.py"

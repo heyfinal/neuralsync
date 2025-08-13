@@ -1,0 +1,47 @@
+services:
+  ns-nginx:
+    image: nginx:1.25
+    container_name: ns-nginx
+    ports: ["8443:8443"]
+    volumes:
+      - ./config/nginx/neuralsync.conf:/etc/nginx/nginx.conf:ro
+      - ./config/tls:/etc/nginx/certs:ro
+    depends_on: [api]
+
+  ns-redis:
+    image: redis:7
+    container_name: ns-redis
+    command: ["redis-server","--save","","--appendonly","no"]
+    ports: ["6379:6379"]
+    volumes:
+      - ./data/redis:/data
+
+  ns-pgbouncer:
+    image: bitnami/pgbouncer:latest
+    container_name: ns-pgbouncer
+    ports: ["6432:6432"]
+    environment:
+      - PGBOUNCER_CONFIGURATION_FILE=/bitnami/pgbouncer/conf/pgbouncer.ini
+    volumes:
+      - ./config/pgbouncer/pgbouncer.ini:/bitnami/pgbouncer/conf/pgbouncer.ini:ro
+    depends_on: [postgres]
+
+  ns-prometheus:
+    image: prom/prometheus:latest
+    container_name: ns-prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus
+
+  ns-grafana:
+    image: grafana/grafana:latest
+    container_name: ns-grafana
+    ports: ["3000:3000"]
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=neuralsync
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./data/grafana:/var/lib/grafana
+    depends_on: [ns-prometheus]
