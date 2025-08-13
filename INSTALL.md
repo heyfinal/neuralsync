@@ -33,6 +33,13 @@ chmod +x install.sh
 
 ## 🎯 What the Installer Does
 
+### **Interactive Setup & Personalization**
+- 👋 **Personal Configuration**: Asks for your name for AI personalization
+- 🔐 **Admin Account**: Creates username/password for NeuralSync management
+- 💾 **NAS Integration**: Configures network storage (mount point or IP/credentials)
+- 🔍 **AI Config Discovery**: Scans for existing AI configs (.claude.md, .cursor-rules, etc.)
+- 📚 **Base Memory**: Compiles found configs into prime directive system
+
 ### **Auto-Detection & Smart Installation**
 - ✅ Detects your operating system (macOS, Linux)
 - ✅ Identifies available AI CLIs (Claude Code, CodexCLI, Autopilot, Aider, Gemini)
@@ -58,6 +65,8 @@ chmod +x install.sh
 │   ├── aider-unrestricted
 │   └── gemini-unrestricted
 ├── config/                # Configuration files
+│   ├── base_memory.md     # Compiled AI configurations
+│   └── prime_directive.md # AI behavior directives
 ├── data/                  # Persistent data storage
 ├── services/              # API and worker services
 ├── bus/                   # AI communication bus

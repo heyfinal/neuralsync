@@ -43,6 +43,15 @@ VENV_DIR="$INSTALL_DIR/venv"
 DETECTED_AIS=""
 DOCKER_AVAILABLE=false
 HOMEBREW_AVAILABLE=false
+USER_NAME=""
+NAS_MOUNT_POINT=""
+NAS_IP=""
+NAS_USERNAME=""
+NAS_PASSWORD=""
+SCAN_AI_CONFIGS=false
+AI_CONFIG_FILES=""
+NEURALSYNC_ADMIN_USER=""
+NEURALSYNC_ADMIN_PASS=""
 
 # Logging function
 log() {
@@ -144,6 +153,279 @@ install_system_dependencies() {
             exit 1
             ;;
     esac
+}
+
+# Get user information and preferences
+get_user_preferences() {
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}🎯 NeuralSync Personal Configuration${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    # Get user's name
+    echo -e "${BLUE}👋 Personal Information${NC}"
+    echo "NeuralSync AIs will address you personally by name for better interaction."
+    read -p "What's your name? (e.g., Daniel, Sarah): " USER_NAME
+    if [ -z "$USER_NAME" ]; then
+        USER_NAME="User"
+    fi
+    log "Hello $USER_NAME! Setting up personalized AI experience..."
+    echo ""
+    
+    # NeuralSync admin credentials
+    echo -e "${BLUE}🔐 Admin Account Setup${NC}"
+    echo "Create admin credentials for NeuralSync configuration and memory access."
+    read -p "Choose admin username (default: admin): " admin_user
+    NEURALSYNC_ADMIN_USER=${admin_user:-admin}
+    
+    while true; do
+        read -s -p "Create admin password: " admin_pass1
+        echo ""
+        read -s -p "Confirm admin password: " admin_pass2
+        echo ""
+        if [ "$admin_pass1" = "$admin_pass2" ]; then
+            NEURALSYNC_ADMIN_PASS="$admin_pass1"
+            break
+        else
+            error "Passwords don't match. Please try again."
+        fi
+    done
+    success "Admin account configured for $NEURALSYNC_ADMIN_USER"
+    echo ""
+    
+    # NAS Configuration
+    echo -e "${BLUE}💾 Network Storage Configuration${NC}"
+    echo "NeuralSync can use network storage for cold memory archival and backup."
+    echo ""
+    read -p "Do you want to configure NAS storage? (y/N): " configure_nas
+    if [[ $configure_nas =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Choose NAS configuration method:"
+        echo "1) Direct mount point (e.g., /Volumes/MyNAS, /mnt/nas)"
+        echo "2) IP address with credentials"
+        read -p "Enter choice (1-2): " nas_choice
+        
+        case $nas_choice in
+            1)
+                read -p "Enter NAS mount point path: " NAS_MOUNT_POINT
+                if [ ! -d "$NAS_MOUNT_POINT" ]; then
+                    warn "Mount point $NAS_MOUNT_POINT does not exist. You can configure this later."
+                else
+                    success "NAS mount point configured: $NAS_MOUNT_POINT"
+                fi
+                ;;
+            2)
+                read -p "Enter NAS IP address: " NAS_IP
+                read -p "Enter NAS username: " NAS_USERNAME
+                read -s -p "Enter NAS password: " NAS_PASSWORD
+                echo ""
+                success "NAS credentials configured for $NAS_IP"
+                ;;
+        esac
+    else
+        log "Skipping NAS configuration (can be added later)"
+    fi
+    echo ""
+    
+    # AI Config File Scanning
+    echo -e "${BLUE}🔍 AI Configuration Discovery${NC}"
+    echo "NeuralSync can scan your system for existing AI configuration files"
+    echo "(like .claude.md, .cursor-rules, .aider.conf.yml, etc.) to create"
+    echo "a comprehensive base memory and prime directive system."
+    echo ""
+    echo -e "${YELLOW}This will scan common locations like:${NC}"
+    echo "  • ~/.claude.md, ~/.claude/"
+    echo "  • ~/.cursor/, .cursor-rules"
+    echo "  • ~/.aider.conf.yml"
+    echo "  • ~/.config/ directories"
+    echo "  • Project-specific AI config files"
+    echo ""
+    read -p "Scan and compile AI configuration files? (y/N): " scan_consent
+    if [[ $scan_consent =~ ^[Yy]$ ]]; then
+        SCAN_AI_CONFIGS=true
+        log "Will scan for AI configuration files"
+    else
+        log "Skipping AI config file scanning"
+    fi
+    echo ""
+}
+
+# Scan for existing AI configuration files
+scan_ai_configurations() {
+    if [ "$SCAN_AI_CONFIGS" = false ]; then
+        return
+    fi
+    
+    log "Scanning filesystem for AI configuration files..."
+    
+    # Define common AI config file patterns
+    local config_patterns=(
+        "$HOME/.claude.md"
+        "$HOME/.claude/CLAUDE.md"
+        "$HOME/.claude/config.json"
+        "$HOME/.cursor-rules"
+        "$HOME/.cursor/rules.md"
+        "$HOME/.aider.conf.yml"
+        "$HOME/.aider/config.yml"
+        "$HOME/.config/cursor/"
+        "$HOME/.config/aider/"
+        "$HOME/.config/claude/"
+        "$HOME/.codeium/config.json"
+        "$HOME/.copilot/config.yml"
+        "$HOME/.chatgpt/config.json"
+        "$HOME/CLAUDE.md"
+        "$HOME/AI_INSTRUCTIONS.md"
+        "$HOME/PROJECT_INSTRUCTIONS.md"
+        "$HOME/.ai/"
+        "$HOME/.llm/"
+    )
+    
+    # Find files in common project locations
+    local project_patterns=(
+        "CLAUDE.md"
+        ".claude.md" 
+        ".cursor-rules"
+        ".aider.conf.yml"
+        "AI_INSTRUCTIONS.md"
+        "PROJECT_CONTEXT.md"
+        ".ai/instructions.md"
+        ".github/ai-instructions.md"
+    )
+    
+    AI_CONFIG_FILES=""
+    
+    # Scan home directory patterns
+    for pattern in "${config_patterns[@]}"; do
+        if [ -f "$pattern" ] || [ -d "$pattern" ]; then
+            AI_CONFIG_FILES="$AI_CONFIG_FILES\n$pattern"
+            log "Found: $pattern"
+        fi
+    done
+    
+    # Scan common development directories for project-specific configs
+    local dev_dirs=("$HOME/Desktop" "$HOME/Documents" "$HOME/Projects" "$HOME/Code" "$HOME/Development")
+    for dev_dir in "${dev_dirs[@]}"; do
+        if [ -d "$dev_dir" ]; then
+            for pattern in "${project_patterns[@]}"; do
+                find "$dev_dir" -name "$pattern" -type f 2>/dev/null | while read -r file; do
+                    AI_CONFIG_FILES="$AI_CONFIG_FILES\n$file"
+                    log "Found project config: $file"
+                done
+            done
+        fi
+    done
+    
+    # Also check if we're in a git repository with AI configs
+    local current_dir="$PWD"
+    while [ "$current_dir" != "/" ]; do
+        if [ -d "$current_dir/.git" ]; then
+            for pattern in "${project_patterns[@]}"; do
+                if [ -f "$current_dir/$pattern" ]; then
+                    AI_CONFIG_FILES="$AI_CONFIG_FILES\n$current_dir/$pattern"
+                    log "Found git project config: $current_dir/$pattern"
+                fi
+            done
+            break
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    
+    if [ ! -z "$AI_CONFIG_FILES" ]; then
+        local count=$(echo -e "$AI_CONFIG_FILES" | grep -c .)
+        success "Found $count AI configuration files"
+    else
+        warn "No AI configuration files found"
+    fi
+}
+
+# Compile AI configurations into base memory
+compile_base_memory() {
+    if [ "$SCAN_AI_CONFIGS" = false ] || [ -z "$AI_CONFIG_FILES" ]; then
+        return
+    fi
+    
+    log "Compiling AI configurations into base memory system..."
+    
+    local base_memory_file="$INSTALL_DIR/config/base_memory.md"
+    local prime_directive_file="$INSTALL_DIR/config/prime_directive.md"
+    
+    # Create base memory file
+    cat > "$base_memory_file" << EOF
+# NeuralSync Base Memory System
+# Compiled from user's existing AI configurations
+# Generated: $(date)
+# User: $USER_NAME
+
+## User Profile
+**Name**: $USER_NAME
+**System**: $(uname -a)
+**Install Date**: $(date)
+**NAS Configuration**: ${NAS_MOUNT_POINT:-$NAS_IP}
+
+## Compiled AI Configurations
+
+EOF
+    
+    # Create prime directive file
+    cat > "$prime_directive_file" << EOF
+# NeuralSync Prime Directive
+# Core instructions compiled from user's AI configurations
+# User: $USER_NAME
+
+## Core Identity
+You are part of the NeuralSync AI orchestration platform serving $USER_NAME.
+You have access to persistent memory, cross-AI communication, and comprehensive context.
+
+## User Preferences (Compiled from existing configs)
+
+EOF
+    
+    # Process each found configuration file
+    echo -e "$AI_CONFIG_FILES" | while read -r config_file; do
+        if [ -f "$config_file" ] && [ -s "$config_file" ]; then
+            log "Processing: $config_file"
+            
+            echo "### Configuration from: \`$config_file\`" >> "$base_memory_file"
+            echo "" >> "$base_memory_file"
+            echo "\`\`\`" >> "$base_memory_file"
+            cat "$config_file" >> "$base_memory_file"
+            echo "" >> "$base_memory_file"
+            echo "\`\`\`" >> "$base_memory_file"
+            echo "" >> "$base_memory_file"
+            
+            # Extract key instructions for prime directive
+            if grep -qi "instruction\|rule\|directive\|guideline\|preference" "$config_file"; then
+                echo "#### From \`$(basename "$config_file")\`:" >> "$prime_directive_file"
+                grep -i "instruction\|rule\|directive\|guideline\|preference" "$config_file" | head -10 >> "$prime_directive_file"
+                echo "" >> "$prime_directive_file"
+            fi
+        fi
+    done
+    
+    # Add NeuralSync-specific directives
+    cat >> "$prime_directive_file" << EOF
+
+## NeuralSync Core Directives
+
+1. **Personal Address**: Always address the user as "$USER_NAME"
+2. **Memory Integration**: Utilize persistent memory for context continuity
+3. **Cross-AI Collaboration**: Coordinate with other AI agents when beneficial
+4. **User Autonomy**: Respect user preferences from compiled configurations
+5. **Context Awareness**: Maintain awareness of project context and user goals
+
+## Collaboration Guidelines
+
+When working with other AIs in the NeuralSync network:
+- Share relevant context through the memory system
+- Avoid duplicate work by checking existing memory
+- Coordinate task delegation based on AI strengths
+- Maintain consistent personality and preferences for $USER_NAME
+
+EOF
+    
+    success "Base memory system compiled with user configurations"
+    log "Base memory: $base_memory_file"
+    log "Prime directive: $prime_directive_file"
 }
 
 # Detect available AI CLIs
@@ -481,23 +763,55 @@ configure_environment() {
     # Generate API token
     API_TOKEN=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
     
-    # Update .env file
+    # Hash admin password
+    ADMIN_PASS_HASH=$(echo -n "$NEURALSYNC_ADMIN_PASS" | sha256sum | awk '{print $1}' 2>/dev/null || echo -n "$NEURALSYNC_ADMIN_PASS" | shasum -a 256 | awk '{print $1}')
+    
+    # Update .env file with all configurations
     sed -i.bak "s/NEURALSYNC_API_TOKEN=.*/NEURALSYNC_API_TOKEN=$API_TOKEN/" "$INSTALL_DIR/.env"
     
-    # Ask for OpenAI API key (optional)
+    # Add user and admin configurations
+    cat >> "$INSTALL_DIR/.env" << EOF
+
+# User Configuration
+NEURALSYNC_USER_NAME="$USER_NAME"
+NEURALSYNC_ADMIN_USER="$NEURALSYNC_ADMIN_USER"
+NEURALSYNC_ADMIN_PASS_HASH="$ADMIN_PASS_HASH"
+
+# NAS Configuration
+EOF
+    
+    if [ ! -z "$NAS_MOUNT_POINT" ]; then
+        echo "NEURALSYNC_NAS_MOUNT_POINT=\"$NAS_MOUNT_POINT\"" >> "$INSTALL_DIR/.env"
+    fi
+    
+    if [ ! -z "$NAS_IP" ]; then
+        echo "NEURALSYNC_NAS_IP=\"$NAS_IP\"" >> "$INSTALL_DIR/.env"
+        echo "NEURALSYNC_NAS_USERNAME=\"$NAS_USERNAME\"" >> "$INSTALL_DIR/.env"
+        echo "NEURALSYNC_NAS_PASSWORD=\"$NAS_PASSWORD\"" >> "$INSTALL_DIR/.env"
+    fi
+    
+    # Ask for AI API keys
     echo ""
+    echo -e "${BLUE}🔑 AI Provider API Keys${NC}"
+    echo "Configure API keys for AI providers (optional but recommended):"
+    echo ""
+    
     read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key
     if [ ! -z "$openai_key" ]; then
         sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
     fi
     
-    # Ask for Anthropic API key (optional)
     read -p "Enter Anthropic API Key (optional, press Enter to skip): " anthropic_key
     if [ ! -z "$anthropic_key" ]; then
         echo "ANTHROPIC_API_KEY=$anthropic_key" >> "$INSTALL_DIR/.env"
     fi
     
-    success "Environment configured"
+    read -p "Enter Google AI API Key (optional, press Enter to skip): " google_key
+    if [ ! -z "$google_key" ]; then
+        echo "GOOGLE_AI_API_KEY=$google_key" >> "$INSTALL_DIR/.env"
+    fi
+    
+    success "Environment configured with personalized settings"
 }
 
 # Final setup and testing
@@ -535,11 +849,14 @@ main() {
     
     detect_os
     detect_package_managers
+    get_user_preferences
     install_system_dependencies
     detect_ai_clis
     install_missing_ai_clis
+    scan_ai_configurations
     create_directory_structure
     create_python_venv
+    compile_base_memory
     configure_unrestricted_mode
     setup_neuralsync_files
     setup_path
