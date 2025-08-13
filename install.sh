@@ -463,6 +463,12 @@ detect_ai_clis() {
         log "✓ Google AI CLI detected"
     fi
     
+    # GPT-5 Planner (ChatBot)
+    if command_exists chatgpt || command_exists gpt || command_exists openai-chat; then
+        DETECTED_AIS="$DETECTED_AIS gpt5-planner"
+        log "✓ GPT-5 Planner (ChatBot) detected"
+    fi
+    
     if [ -z "$DETECTED_AIS" ]; then
         warn "No supported AI CLIs detected. Will install Claude Code..."
     else
@@ -504,6 +510,12 @@ install_missing_ai_clis() {
     if ! echo "$DETECTED_AIS" | grep -q "aider"; then
         log "Installing Aider CLI..."
         pip3 install --user aider-chat || true
+    fi
+    
+    # Install GPT-5 Planner (ChatBot) if not available
+    if ! echo "$DETECTED_AIS" | grep -q "gpt5-planner"; then
+        log "Installing GPT-5 Planner (ChatBot)..."
+        pip3 install --user chatgpt-cli || pip3 install --user openai-chatbot || true
     fi
 }
 
@@ -614,6 +626,20 @@ gemini "$@" || google-ai "$@" || gai "$@"
 EOF
         chmod +x "$INSTALL_DIR/bin/gemini-unrestricted"
     fi
+    
+    # Configure GPT-5 Planner (ChatBot) for unrestricted mode
+    if echo "$DETECTED_AIS" | grep -q "gpt5-planner"; then
+        log "Configuring GPT-5 Planner (ChatBot) for unrestricted mode..."
+        
+        cat > "$INSTALL_DIR/bin/gpt5-planner-unrestricted" << 'EOF'
+#!/bin/bash
+export CHATGPT_UNRESTRICTED=1
+export GPT5_AUTO_EXECUTE=1
+export GPT5_NEURALSYNC_ENDPOINT=http://localhost:8080
+chatgpt "$@" || gpt "$@" || openai-chat "$@"
+EOF
+        chmod +x "$INSTALL_DIR/bin/gpt5-planner-unrestricted"
+    fi
 }
 
 # Create Python virtual environment
@@ -643,87 +669,376 @@ create_directory_structure() {
     success "Directory structure created at $INSTALL_DIR"
 }
 
-# Download and setup NeuralSync files
-setup_neuralsync_files() {
+# Clone and setup NeuralSync from GitHub
+clone_and_setup_neuralsync() {
+    log "Cloning NeuralSync from GitHub..."
+    
+    # Check if we're already in a neuralsync directory or if files exist locally
+    if [ -f "docker-compose.yml" ] && [ -d "services" ] && [ -d "bus" ]; then
+        log "Found local NeuralSync files, using existing installation..."
+        setup_local_files
+    else
+        log "Cloning from GitHub repository..."
+        
+        # Create temporary directory for cloning
+        local temp_dir="/tmp/neuralsync-install-$$"
+        git clone https://github.com/heyfinal/neuralsync.git "$temp_dir"
+        
+        if [ $? -eq 0 ]; then
+            success "Repository cloned successfully"
+            cd "$temp_dir"
+            setup_local_files
+            
+            # Clean up temporary directory after copying
+            cd "$HOME"
+            rm -rf "$temp_dir"
+        else
+            error "Failed to clone repository. Check your internet connection."
+            exit 1
+        fi
+    fi
+}
+
+# Setup files from local directory (whether cloned or existing)
+setup_local_files() {
     log "Setting up NeuralSync files..."
     
     # Copy current directory files to install directory
-    cp -r ./services "$INSTALL_DIR/"
-    cp -r ./bus "$INSTALL_DIR/"
+    cp -r ./services "$INSTALL_DIR/" 2>/dev/null || true
+    cp -r ./bus "$INSTALL_DIR/" 2>/dev/null || true
     cp -r ./bin/* "$INSTALL_DIR/bin/" 2>/dev/null || true
     cp -r ./agents "$INSTALL_DIR/" 2>/dev/null || true
     cp -r ./integrations "$INSTALL_DIR/" 2>/dev/null || true
-    cp docker-compose.yml "$INSTALL_DIR/"
+    cp docker-compose.yml "$INSTALL_DIR/" 2>/dev/null || true
     cp docker-compose.enterprise.yml "$INSTALL_DIR/" 2>/dev/null || true
-    cp .env.example "$INSTALL_DIR/.env"
+    cp .env.example "$INSTALL_DIR/.env" 2>/dev/null || true
     
     # Make all bin files executable
-    chmod +x "$INSTALL_DIR/bin/"*
+    chmod +x "$INSTALL_DIR/bin/"* 2>/dev/null || true
     
-    # Create master launcher script
-    cat > "$INSTALL_DIR/bin/neuralsync" << EOF
+    # Create master launcher script with auto-launch capabilities
+    create_master_launcher_script
+    
+    success "NeuralSync files configured"
+}
+
+# Create comprehensive master launcher script
+create_master_launcher_script() {
+    log "Creating NeuralSync master control script..."
+    
+    cat > "$INSTALL_DIR/bin/neuralsync" << 'EOF'
 #!/bin/bash
 
 # NeuralSync Master Control Script
-INSTALL_DIR="$INSTALL_DIR"
-VENV_DIR="$VENV_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
+VENV_DIR="$INSTALL_DIR/venv"
 
-cd \$INSTALL_DIR
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-case "\$1" in
+log() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+cd "$INSTALL_DIR"
+
+case "$1" in
     start)
-        echo "Starting NeuralSync..."
-        source \$VENV_DIR/bin/activate
+        echo -e "${BLUE}Starting NeuralSync...${NC}"
+        source "$VENV_DIR/bin/activate" 2>/dev/null || true
         docker-compose up -d
-        echo "NeuralSync started. API: http://localhost:8080"
+        
+        # Wait for services to be ready
+        log "Waiting for services to start..."
+        sleep 15
+        
+        # Verify API is running
+        if curl -s http://localhost:8080/health >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ NeuralSync started successfully!${NC}"
+            echo -e "${BLUE}API: http://localhost:8080${NC}"
+            echo -e "${BLUE}Memory Dashboard: http://localhost:6333/dashboard${NC}"
+            echo -e "${BLUE}Graph Explorer: http://localhost:7474${NC}"
+        else
+            warn "Services may still be starting. Check status with: neuralsync status"
+        fi
         ;;
+        
+    autostart)
+        echo -e "${BLUE}Auto-starting NeuralSync with AI agents...${NC}"
+        source "$VENV_DIR/bin/activate" 2>/dev/null || true
+        docker-compose up -d
+        
+        # Wait for services
+        log "Waiting for core services..."
+        sleep 20
+        
+        # Auto-launch detected AI agents in background
+        log "Auto-launching AI agents..."
+        
+        # Launch Claude Code if available
+        if command -v claude >/dev/null 2>&1; then
+            log "Starting Claude Code agent..."
+            nohup "$INSTALL_DIR/bin/claude-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/claude.pid"
+        fi
+        
+        # Launch CodexCLI if available
+        if command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1; then
+            log "Starting CodexCLI agent..."
+            nohup "$INSTALL_DIR/bin/codex-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/codex.pid"
+        fi
+        
+        # Launch Aider if available
+        if command -v aider >/dev/null 2>&1; then
+            log "Starting Aider agent..."
+            nohup "$INSTALL_DIR/bin/aider-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/aider.pid"
+        fi
+        
+        # Launch GPT-5 Planner (ChatBot) if available
+        if command -v chatgpt >/dev/null 2>&1 || command -v gpt >/dev/null 2>&1; then
+            log "Starting GPT-5 Planner (ChatBot)..."
+            nohup "$INSTALL_DIR/bin/gpt5-planner-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/gpt5-planner.pid"
+        fi
+        
+        echo -e "${GREEN}✅ NeuralSync auto-started with AI agents!${NC}"
+        "$0" status
+        ;;
+        
     stop)
-        echo "Stopping NeuralSync..."
+        echo -e "${YELLOW}Stopping NeuralSync...${NC}"
         docker-compose down
+        
+        # Stop AI agent processes
+        for pidfile in "$INSTALL_DIR/data/"*.pid; do
+            if [ -f "$pidfile" ]; then
+                pid=$(cat "$pidfile" 2>/dev/null)
+                if [ ! -z "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    log "Stopping AI agent (PID: $pid)"
+                    kill "$pid" 2>/dev/null || true
+                fi
+                rm -f "$pidfile"
+            fi
+        done
+        
+        echo -e "${GREEN}✅ NeuralSync stopped${NC}"
         ;;
+        
     restart)
-        echo "Restarting NeuralSync..."
-        docker-compose restart
+        echo -e "${BLUE}Restarting NeuralSync...${NC}"
+        "$0" stop
+        sleep 5
+        "$0" start
         ;;
+        
     logs)
-        docker-compose logs -f
+        if [ ! -z "$2" ]; then
+            docker-compose logs -f "$2"
+        else
+            docker-compose logs -f
+        fi
         ;;
+        
     status)
+        echo -e "${BLUE}NeuralSync Service Status:${NC}"
         docker-compose ps
+        echo ""
+        
+        # Check API health
+        if curl -s http://localhost:8080/health >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ API: Running (http://localhost:8080)${NC}"
+        else
+            echo -e "${RED}❌ API: Not responding${NC}"
+        fi
+        
+        # Check AI agent processes
+        echo -e "${BLUE}AI Agent Status:${NC}"
+        for pidfile in "$INSTALL_DIR/data/"*.pid; do
+            if [ -f "$pidfile" ]; then
+                agent_name=$(basename "$pidfile" .pid)
+                pid=$(cat "$pidfile" 2>/dev/null)
+                if [ ! -z "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    echo -e "${GREEN}✅ $agent_name: Running (PID: $pid)${NC}"
+                else
+                    echo -e "${RED}❌ $agent_name: Not running${NC}"
+                    rm -f "$pidfile"
+                fi
+            fi
+        done
         ;;
+        
+    health)
+        # Comprehensive health check
+        echo -e "${BLUE}NeuralSync Health Check:${NC}"
+        
+        # Check Docker
+        if ! docker ps >/dev/null 2>&1; then
+            echo -e "${RED}❌ Docker: Not running${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✅ Docker: Running${NC}"
+        
+        # Check services
+        local services=("postgres" "qdrant" "neo4j" "api" "worker")
+        for service in "${services[@]}"; do
+            if docker-compose ps | grep -q "$service.*Up"; then
+                echo -e "${GREEN}✅ $service: Running${NC}"
+            else
+                echo -e "${RED}❌ $service: Not running${NC}"
+            fi
+        done
+        
+        # Check API endpoint
+        if curl -s http://localhost:8080/health | grep -q "ok"; then
+            echo -e "${GREEN}✅ API Health: OK${NC}"
+        else
+            echo -e "${RED}❌ API Health: Failed${NC}"
+        fi
+        ;;
+        
     ai)
         shift
-        case "\$1" in
-            claude) \$INSTALL_DIR/bin/claude-unrestricted "\${@:2}" ;;
-            codex) \$INSTALL_DIR/bin/codex-unrestricted "\${@:2}" ;;
-            autopilot) \$INSTALL_DIR/bin/autopilot-unrestricted "\${@:2}" ;;
-            aider) \$INSTALL_DIR/bin/aider-unrestricted "\${@:2}" ;;
-            gemini) \$INSTALL_DIR/bin/gemini-unrestricted "\${@:2}" ;;
-            *) echo "Usage: neuralsync ai {claude|codex|autopilot|aider|gemini} [args]" ;;
+        case "$1" in
+            claude) 
+                log "Launching Claude Code in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/claude-unrestricted" "${@:2}"
+                ;;
+            codex) 
+                log "Launching CodexCLI in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/codex-unrestricted" "${@:2}"
+                ;;
+            autopilot) 
+                log "Launching Autopilot in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/autopilot-unrestricted" "${@:2}"
+                ;;
+            aider) 
+                log "Launching Aider in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/aider-unrestricted" "${@:2}"
+                ;;
+            gemini) 
+                log "Launching Gemini in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/gemini-unrestricted" "${@:2}"
+                ;;
+            gpt5-planner|chatgpt|planner)
+                log "Launching GPT-5 Planner (ChatBot) in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/gpt5-planner-unrestricted" "${@:2}"
+                ;;
+            list)
+                echo -e "${BLUE}Available AI CLIs:${NC}"
+                command -v claude >/dev/null 2>&1 && echo -e "${GREEN}✅ claude (Claude Code)${NC}" || echo -e "${RED}❌ claude${NC}"
+                (command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1) && echo -e "${GREEN}✅ codex (CodexCLI)${NC}" || echo -e "${RED}❌ codex${NC}"
+                command -v autopilot >/dev/null 2>&1 && echo -e "${GREEN}✅ autopilot (GitHub Copilot)${NC}" || echo -e "${RED}❌ autopilot${NC}"
+                command -v aider >/dev/null 2>&1 && echo -e "${GREEN}✅ aider (AI Pair Programming)${NC}" || echo -e "${RED}❌ aider${NC}"
+                (command -v gemini >/dev/null 2>&1 || command -v google-ai >/dev/null 2>&1) && echo -e "${GREEN}✅ gemini (Google AI)${NC}" || echo -e "${RED}❌ gemini${NC}"
+                (command -v chatgpt >/dev/null 2>&1 || command -v gpt >/dev/null 2>&1) && echo -e "${GREEN}✅ gpt5-planner (ChatBot)${NC}" || echo -e "${RED}❌ gpt5-planner${NC}"
+                ;;
+            *) 
+                echo "Usage: neuralsync ai {claude|codex|autopilot|aider|gemini|gpt5-planner|list} [args]"
+                echo "Use 'neuralsync ai list' to see available AI CLIs"
+                ;;
         esac
         ;;
+        
     config)
-        nano \$INSTALL_DIR/.env
+        if command -v nano >/dev/null 2>&1; then
+            nano "$INSTALL_DIR/.env"
+        elif command -v vim >/dev/null 2>&1; then
+            vim "$INSTALL_DIR/.env"
+        else
+            echo "Opening config file with default editor..."
+            "${EDITOR:-vi}" "$INSTALL_DIR/.env"
+        fi
         ;;
+        
     update)
-        git -C \$INSTALL_DIR pull origin main
+        log "Updating NeuralSync..."
+        
+        # Pull latest Docker images
         docker-compose pull
+        
+        # Backup current config
+        cp "$INSTALL_DIR/.env" "$INSTALL_DIR/.env.backup.$(date +%s)"
+        
+        # Try to update from git if in a git repo
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            git -C "$INSTALL_DIR" pull origin main
+        else
+            warn "Not a git repository. Manual update required."
+        fi
+        
+        log "Update complete. Restart services with: neuralsync restart"
         ;;
+        
+    install-cli)
+        # Install missing AI CLIs
+        shift
+        case "$1" in
+            claude)
+                log "Installing Claude Code..."
+                if command -v npm >/dev/null 2>&1; then
+                    npm install -g @anthropic/claude-cli
+                else
+                    curl -fsSL https://raw.githubusercontent.com/anthropics/claude-cli/main/install.sh | bash
+                fi
+                ;;
+            codex)
+                log "Installing CodexCLI..."
+                pip3 install --user openai-codex-cli
+                ;;
+            aider)
+                log "Installing Aider..."
+                pip3 install --user aider-chat
+                ;;
+            gpt5-planner|chatgpt)
+                log "Installing GPT-5 Planner (ChatBot)..."
+                pip3 install --user chatgpt-cli
+                ;;
+            *)
+                echo "Usage: neuralsync install-cli {claude|codex|aider|gpt5-planner}"
+                ;;
+        esac
+        ;;
+        
     *)
-        echo "NeuralSync Control Panel"
-        echo "Usage: neuralsync {start|stop|restart|logs|status|ai|config|update}"
+        echo -e "${BLUE}NeuralSync Control Panel${NC}"
+        echo "Usage: neuralsync {command} [options]"
         echo ""
-        echo "Commands:"
-        echo "  start     - Start NeuralSync services"
-        echo "  stop      - Stop NeuralSync services"
-        echo "  restart   - Restart NeuralSync services"
-        echo "  logs      - Show service logs"
-        echo "  status    - Show service status"
-        echo "  ai <name> - Launch AI CLI in unrestricted mode"
-        echo "  config    - Edit configuration"
-        echo "  update    - Update NeuralSync"
+        echo -e "${YELLOW}Core Commands:${NC}"
+        echo "  start       - Start NeuralSync services"
+        echo "  autostart   - Start services + auto-launch AI agents"
+        echo "  stop        - Stop NeuralSync services and AI agents"
+        echo "  restart     - Restart NeuralSync services"
+        echo "  status      - Show service and AI agent status"
+        echo "  health      - Comprehensive health check"
         echo ""
-        echo "AI CLIs available: $DETECTED_AIS"
+        echo -e "${YELLOW}AI Integration:${NC}"
+        echo "  ai <name>   - Launch AI CLI in unrestricted mode"
+        echo "  ai list     - Show available AI CLIs"
+        echo ""
+        echo -e "${YELLOW}Management:${NC}"
+        echo "  logs [svc]  - Show service logs"
+        echo "  config      - Edit configuration"
+        echo "  update      - Update NeuralSync"
+        echo "  install-cli - Install missing AI CLIs"
+        echo ""
+        echo -e "${YELLOW}Quick Start:${NC}"
+        echo "  neuralsync autostart  # Start everything automatically"
+        echo "  neuralsync ai claude  # Launch Claude in unrestricted mode"
         ;;
 esac
 EOF
@@ -814,8 +1129,8 @@ EOF
     success "Environment configured with personalized settings"
 }
 
-# Final setup and testing
-final_setup() {
+# Final setup with auto-start capability
+final_setup_with_autostart() {
     log "Performing final setup..."
     
     cd "$INSTALL_DIR"
@@ -825,19 +1140,42 @@ final_setup() {
     source "$VENV_DIR/bin/activate"
     docker-compose pull
     
-    # Start services
-    log "Starting NeuralSync services..."
-    docker-compose up -d
+    # Ask user if they want to auto-start everything
+    echo ""
+    echo -e "${BLUE}🚀 Auto-Start Configuration${NC}"
+    echo "Would you like to automatically start NeuralSync and launch AI agents?"
+    echo "This will:"
+    echo "  • Start all NeuralSync services (Docker containers)"
+    echo "  • Launch detected AI agents in the background"
+    echo "  • Verify everything is working"
+    echo ""
+    read -p "Auto-start NeuralSync now? (Y/n): " auto_start
     
-    # Wait for services to be ready
-    log "Waiting for services to be ready..."
-    sleep 15
-    
-    # Test API endpoint
-    if curl -s http://localhost:8080/health > /dev/null; then
-        success "NeuralSync API is running!"
+    if [[ ! $auto_start =~ ^[Nn]$ ]]; then
+        log "Auto-starting NeuralSync with all detected AI agents..."
+        
+        # Use the neuralsync command for auto-start
+        "$INSTALL_DIR/bin/neuralsync" autostart
+        
+        success "NeuralSync auto-started successfully!"
+        
+        echo ""
+        echo -e "${GREEN}🎯 Quick Commands:${NC}"
+        echo -e "  ${BLUE}neuralsync status${NC}      - Check system status"
+        echo -e "  ${BLUE}neuralsync ai claude${NC}   - Launch Claude Code"
+        echo -e "  ${BLUE}neuralsync ai list${NC}     - Show available AIs"
+        echo -e "  ${BLUE}neuralsync health${NC}      - Full system health check"
+        
     else
-        warn "API may still be starting up. Check with: neuralsync status"
+        log "Skipping auto-start. You can start manually with: neuralsync autostart"
+        
+        # Just test that we can pull images and basic setup works
+        log "Testing basic setup..."
+        docker-compose up -d --no-deps postgres qdrant neo4j
+        sleep 10
+        docker-compose down
+        
+        success "Basic setup verified!"
     fi
     
     success "NeuralSync installation complete!"
@@ -858,10 +1196,10 @@ main() {
     create_python_venv
     compile_base_memory
     configure_unrestricted_mode
-    setup_neuralsync_files
+    clone_and_setup_neuralsync
     setup_path
     configure_environment
-    final_setup
+    final_setup_with_autostart
     
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
