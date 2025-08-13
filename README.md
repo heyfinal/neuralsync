@@ -1,3 +1,18 @@
+```
+:::.    :::..,::::::  ...    ::::::::::..    :::.      :::     
+`;;;;,  `;;;;;;;''''  ;;     ;;;;;;;``;;;;   ;;`;;     ;;;     
+  [[[[[. '[[ [[cccc  [['     [[[ [[[,/[[['  ,[[ '[[,   [[[     
+  $$$ "Y$c$$ $$""""  $$      $$$ $$$$$$c   c$$$cc$$$c  $$'     
+  888    Y88 888oo,__88    .d888 888b "88bo,888   888,o88oo,.__
+  MMM     YM """"YUMMM"YmmMMMM"" MMMM   "W" YMM   ""` """"YUMMM
+                 .::::::..-:.     ::-.:::.    :::.  .,-:::::   
+                ;;;`    ` ';;.   ;;;;'`;;;;,  `;;;,;;;'````'   
+                '[==/[[[[,  '[[,[[['    [[[[[. '[[[[[          
+                  '''    $    c$$"      $$$ "Y$c$$$$$          
+                 88b    dP  ,8P"`       888    Y88`88bo,__,o,  
+                  "YMmMY"  mM"          MMM     YM  "YUMMMMMP"
+```
+
 # NeuralSync - Distributed AI Memory & Orchestration Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
