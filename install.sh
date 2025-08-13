@@ -52,6 +52,7 @@ SCAN_AI_CONFIGS=false
 AI_CONFIG_FILES=""
 NEURALSYNC_ADMIN_USER=""
 NEURALSYNC_ADMIN_PASS=""
+NEURALSYNC_SYNC_MODE=""
 
 # Logging function
 log() {
@@ -193,9 +194,37 @@ get_user_preferences() {
     success "Admin account configured for $NEURALSYNC_ADMIN_USER"
     echo ""
     
+    # Sync Mode Configuration
+    echo -e "${BLUE}🔄 Memory Sync Mode Configuration${NC}"
+    echo "Choose how NeuralSync handles memory across devices:"
+    echo ""
+    echo "1) Real-time Sync - Continuous synchronization across all devices"
+    echo "2) Manual Handoff - Export/import memory bundles between devices"
+    echo "3) Hybrid Mode - Real-time sync with manual handoff capability"
+    echo ""
+    read -p "Select sync mode (1-3, default: 3): " sync_mode
+    case ${sync_mode:-3} in
+        1)
+            NEURALSYNC_SYNC_MODE="realtime"
+            log "Real-time sync mode selected - memories sync continuously"
+            ;;
+        2)
+            NEURALSYNC_SYNC_MODE="handoff"
+            log "Manual handoff mode selected - memories transfer via export/import"
+            ;;
+        *)
+            NEURALSYNC_SYNC_MODE="hybrid"
+            log "Hybrid mode selected - both real-time sync and handoff available"
+            ;;
+    esac
+    echo ""
+    
     # NAS Configuration
     echo -e "${BLUE}💾 Network Storage Configuration${NC}"
     echo "NeuralSync can use network storage for cold memory archival and backup."
+    if [ "$NEURALSYNC_SYNC_MODE" = "realtime" ] || [ "$NEURALSYNC_SYNC_MODE" = "hybrid" ]; then
+        echo -e "${YELLOW}Note: NAS is recommended for real-time sync mode${NC}"
+    fi
     echo ""
     read -p "Do you want to configure NAS storage? (y/N): " configure_nas
     if [[ $configure_nas =~ ^[Yy]$ ]]; then
@@ -1300,6 +1329,128 @@ case "$1" in
         esac
         ;;
         
+    handoff)
+        shift
+        case "$1" in
+            export)
+                echo -e "${BLUE}Exporting memory for handoff...${NC}"
+                thread_id="${2:-$(date +%Y%m%d_%H%M%S)}"
+                export_file="$INSTALL_DIR/data/handoff_${thread_id}.nsync"
+                
+                # Create handoff bundle
+                log "Creating handoff bundle: $export_file"
+                tar -czf "$export_file" \
+                    "$INSTALL_DIR/data/api/" \
+                    "$INSTALL_DIR/config/base_memory.md" \
+                    "$INSTALL_DIR/config/prime_directive.md" \
+                    2>/dev/null || true
+                
+                echo -e "${GREEN}✅ Handoff bundle created: $export_file${NC}"
+                echo "Transfer this file to target device and import with:"
+                echo "  neuralsync handoff import $export_file"
+                ;;
+                
+            import)
+                if [ -z "$2" ]; then
+                    error "Usage: neuralsync handoff import <bundle_file>"
+                    exit 1
+                fi
+                
+                echo -e "${BLUE}Importing memory from handoff...${NC}"
+                import_file="$2"
+                
+                if [ ! -f "$import_file" ]; then
+                    error "Handoff bundle not found: $import_file"
+                    exit 1
+                fi
+                
+                # Backup current state
+                backup_dir="$INSTALL_DIR/data/backup_$(date +%Y%m%d_%H%M%S)"
+                mkdir -p "$backup_dir"
+                cp -r "$INSTALL_DIR/data/api/" "$backup_dir/" 2>/dev/null || true
+                
+                # Import handoff bundle
+                tar -xzf "$import_file" -C "/" 2>/dev/null || true
+                
+                echo -e "${GREEN}✅ Memory imported successfully${NC}"
+                echo "Restart services to apply: neuralsync restart"
+                ;;
+                
+            status)
+                echo -e "${BLUE}Handoff Status:${NC}"
+                echo "Sync Mode: $(grep NEURALSYNC_SYNC_MODE "$INSTALL_DIR/.env" | cut -d'"' -f2)"
+                echo ""
+                echo "Available handoff bundles:"
+                ls -lh "$INSTALL_DIR/data/"handoff_*.nsync 2>/dev/null || echo "  No handoff bundles found"
+                ;;
+                
+            *)
+                echo "Usage: neuralsync handoff {export|import|status}"
+                echo ""
+                echo "  export [thread_id] - Create handoff bundle"
+                echo "  import <file>      - Import handoff bundle"
+                echo "  status             - Show handoff status"
+                ;;
+        esac
+        ;;
+        
+    sync)
+        shift
+        case "$1" in
+            enable)
+                log "Enabling real-time sync..."
+                sed -i.bak 's/NEURALSYNC_SYNC_MODE=.*/NEURALSYNC_SYNC_MODE="realtime"/' "$INSTALL_DIR/.env"
+                echo -e "${GREEN}✅ Real-time sync enabled${NC}"
+                echo "Restart services to apply: neuralsync restart"
+                ;;
+                
+            disable)
+                log "Disabling real-time sync..."
+                sed -i.bak 's/NEURALSYNC_SYNC_MODE=.*/NEURALSYNC_SYNC_MODE="handoff"/' "$INSTALL_DIR/.env"
+                echo -e "${GREEN}✅ Real-time sync disabled (handoff mode only)${NC}"
+                echo "Restart services to apply: neuralsync restart"
+                ;;
+                
+            status)
+                mode=$(grep NEURALSYNC_SYNC_MODE "$INSTALL_DIR/.env" | cut -d'"' -f2)
+                echo -e "${BLUE}Sync Status:${NC}"
+                case "$mode" in
+                    realtime)
+                        echo -e "${GREEN}✅ Real-time sync: ENABLED${NC}"
+                        echo "Memories sync continuously across devices"
+                        ;;
+                    handoff)
+                        echo -e "${YELLOW}⚠️ Real-time sync: DISABLED${NC}"
+                        echo "Manual handoff mode - use 'neuralsync handoff' commands"
+                        ;;
+                    hybrid)
+                        echo -e "${GREEN}✅ Hybrid mode: ENABLED${NC}"
+                        echo "Both real-time sync and manual handoff available"
+                        ;;
+                esac
+                
+                # Check NAS status if in realtime mode
+                if [ "$mode" = "realtime" ] || [ "$mode" = "hybrid" ]; then
+                    echo ""
+                    nas_mount=$(grep NEURALSYNC_NAS_MOUNT_POINT "$INSTALL_DIR/.env" | cut -d'"' -f2)
+                    if [ ! -z "$nas_mount" ] && [ -d "$nas_mount" ]; then
+                        echo -e "${GREEN}✅ NAS: Connected ($nas_mount)${NC}"
+                    else
+                        echo -e "${YELLOW}⚠️ NAS: Not configured or unavailable${NC}"
+                    fi
+                fi
+                ;;
+                
+            *)
+                echo "Usage: neuralsync sync {enable|disable|status}"
+                echo ""
+                echo "  enable  - Enable real-time synchronization"
+                echo "  disable - Use manual handoff only"
+                echo "  status  - Show current sync configuration"
+                ;;
+        esac
+        ;;
+        
     *)
         echo -e "${BLUE}NeuralSync Control Panel${NC}"
         echo "Usage: neuralsync {command} [options]"
@@ -1312,6 +1463,10 @@ case "$1" in
         echo "  status      - Show service and AI agent status"
         echo "  health      - Comprehensive health check"
         echo ""
+        echo -e "${YELLOW}Memory Sync:${NC}"
+        echo "  sync        - Manage real-time synchronization"
+        echo "  handoff     - Export/import memory bundles"
+        echo ""
         echo -e "${YELLOW}AI Integration:${NC}"
         echo "  ai <name>   - Launch AI CLI in unrestricted mode"
         echo "  ai list     - Show available AI CLIs"
@@ -1323,8 +1478,9 @@ case "$1" in
         echo "  install-cli - Install missing AI CLIs"
         echo ""
         echo -e "${YELLOW}Quick Start:${NC}"
-        echo "  neuralsync autostart  # Start everything automatically"
-        echo "  neuralsync ai claude  # Launch Claude in unrestricted mode"
+        echo "  neuralsync autostart      # Start everything automatically"
+        echo "  neuralsync handoff export # Create memory bundle for transfer"
+        echo "  neuralsync ai claude      # Launch Claude in unrestricted mode"
         ;;
 esac
 EOF
@@ -1377,6 +1533,9 @@ configure_environment() {
 NEURALSYNC_USER_NAME="$USER_NAME"
 NEURALSYNC_ADMIN_USER="$NEURALSYNC_ADMIN_USER"
 NEURALSYNC_ADMIN_PASS_HASH="$ADMIN_PASS_HASH"
+
+# Sync Mode Configuration
+NEURALSYNC_SYNC_MODE="$NEURALSYNC_SYNC_MODE"
 
 # NAS Configuration
 EOF

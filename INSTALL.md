@@ -36,6 +36,7 @@ chmod +x install.sh
 ### **Interactive Setup & Personalization**
 - 👋 **Personal Configuration**: Asks for your name for AI personalization
 - 🔐 **Admin Account**: Creates username/password for NeuralSync management
+- 🔄 **Sync Mode Selection**: Choose between real-time sync, manual handoff, or hybrid
 - 💾 **NAS Integration**: Configures network storage (mount point or IP/credentials)
 - 🔍 **AI Config Discovery**: Scans for existing AI configs (.claude.md, .cursor-rules, etc.)
 - 📚 **Base Memory**: Compiles found configs into prime directive system
@@ -88,6 +89,19 @@ neuralsync stop            # Stop all services
 neuralsync status          # Check service status
 neuralsync logs            # View service logs
 neuralsync config          # Edit configuration
+```
+
+### **Memory Sync Commands**
+```bash
+# Real-time Sync
+neuralsync sync enable     # Enable continuous sync
+neuralsync sync disable    # Switch to handoff-only mode
+neuralsync sync status     # Check current sync mode
+
+# Manual Handoff
+neuralsync handoff export  # Create memory bundle
+neuralsync handoff import <file>  # Import memory bundle
+neuralsync handoff status  # List available bundles
 ```
 
 ### **AI CLI Integration**

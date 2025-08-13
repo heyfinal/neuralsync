@@ -125,14 +125,40 @@ Your NeuralSync instance is now running with:
 - **Intelligent Routing**: Cost and capability-optimized task assignment
 - **Real-time Coordination**: WebSocket-based instant communication
 
-### **Device Handoff**
-```bash
-# On Device A
-neuralsync export --thread abc123 --target device-b
+### **Memory Sync Modes**
 
-# On Device B  
-neuralsync import --thread abc123 --continue
-# Conversation continues exactly where it left off
+NeuralSync supports three sync modes for flexible deployment:
+
+#### **1. Real-time Sync**
+Continuous memory synchronization across all devices via NAS/network storage.
+```bash
+neuralsync sync enable         # Enable real-time sync
+neuralsync sync status         # Check sync status
+```
+
+#### **2. Manual Handoff**
+Export/import memory bundles for air-gapped or secure environments.
+```bash
+# On Device A - Export memory
+neuralsync handoff export      # Creates handoff_[timestamp].nsync file
+
+# Transfer file to Device B (USB, secure transfer, etc.)
+
+# On Device B - Import memory
+neuralsync handoff import /path/to/handoff_20250813_120000.nsync
+```
+
+#### **3. Hybrid Mode (Default)**
+Both real-time sync and manual handoff available - best of both worlds.
+```bash
+# Use real-time sync when connected
+neuralsync sync status
+
+# Create handoff bundle for offline transfer
+neuralsync handoff export meeting_notes
+
+# Import on disconnected device
+neuralsync handoff import meeting_notes.nsync
 ```
 
 ### **MCP Tools Integration**
