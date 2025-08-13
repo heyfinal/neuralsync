@@ -439,28 +439,46 @@ detect_ai_clis() {
         log "✓ Claude Code detected"
     fi
     
-    # CodexCLI
-    if command_exists codex || command_exists codes; then
-        DETECTED_AIS="$DETECTED_AIS codexcli"
-        log "✓ CodexCLI detected"
-    fi
-    
-    # Autopilot CLI
-    if command_exists autopilot || command_exists github-copilot-cli || command_exists gh-copilot; then
-        DETECTED_AIS="$DETECTED_AIS autopilot"
-        log "✓ Autopilot CLI detected"
-    fi
-    
-    # Aider CLI
+    # Aider - Terminal warrior's dream, top SWE Bench score
     if command_exists aider; then
         DETECTED_AIS="$DETECTED_AIS aider"
         log "✓ Aider CLI detected"
     fi
     
-    # Google AI CLI (Gemini)
+    # Gemini CLI - Google's open-source terminal agent
     if command_exists gemini || command_exists google-ai || command_exists gai; then
         DETECTED_AIS="$DETECTED_AIS gemini"
-        log "✓ Google AI CLI detected"
+        log "✓ Gemini CLI detected"
+    fi
+    
+    # Warp - Agentic development environment terminal
+    if command_exists warp; then
+        DETECTED_AIS="$DETECTED_AIS warp"
+        log "✓ Warp terminal detected"
+    fi
+    
+    # Fabric - Open-source AI augmentation framework
+    if command_exists fabric; then
+        DETECTED_AIS="$DETECTED_AIS fabric"
+        log "✓ Fabric CLI detected"
+    fi
+    
+    # CodexCLI - OpenAI's terminal interface
+    if command_exists codex || command_exists codes; then
+        DETECTED_AIS="$DETECTED_AIS codex"
+        log "✓ Codex CLI detected"
+    fi
+    
+    # Ollama - Run AI models locally
+    if command_exists ollama; then
+        DETECTED_AIS="$DETECTED_AIS ollama"
+        log "✓ Ollama detected"
+    fi
+    
+    # Autopilot CLI (GitHub Copilot)
+    if command_exists autopilot || command_exists github-copilot-cli || command_exists gh-copilot; then
+        DETECTED_AIS="$DETECTED_AIS autopilot"
+        log "✓ GitHub Copilot CLI detected"
     fi
     
     # GPT-5 Planner (ChatBot)
@@ -470,52 +488,223 @@ detect_ai_clis() {
     fi
     
     if [ -z "$DETECTED_AIS" ]; then
-        warn "No supported AI CLIs detected. Will install Claude Code..."
+        warn "No supported AI CLIs detected."
     else
         success "Detected AI CLIs: $DETECTED_AIS"
     fi
 }
 
-# Install missing AI CLIs
+# Interactive AI CLI installation menu
 install_missing_ai_clis() {
-    log "Installing missing AI CLIs..."
+    if [ ! -z "$DETECTED_AIS" ]; then
+        log "Found existing AI CLIs: $DETECTED_AIS"
+        echo ""
+    fi
     
-    # Always ensure Claude Code is available
-    if ! command_exists claude; then
-        log "Installing Claude Code..."
-        case $OS_TYPE in
-            "macOS")
-                # Install Claude Code via npm or direct download
-                if command_exists npm; then
-                    npm install -g @anthropic/claude-cli
-                else
-                    # Install via Homebrew or direct download
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${PURPLE}🤖 Elite AI CLI Installation Menu${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${BLUE}Choose which AI CLIs to install (based on elite developer preferences 2025):${NC}"
+    echo ""
+    
+    # Define available AI tools with descriptions
+    declare -A ai_tools
+    ai_tools["claude-code"]="Claude Code - Anthropic's CLI with advanced reasoning"
+    ai_tools["aider"]="Aider - Terminal warrior's dream, top SWE Bench score"
+    ai_tools["gemini"]="Gemini CLI - Google's open-source terminal agent (1M token context)"
+    ai_tools["warp"]="Warp - Agentic development environment terminal"
+    ai_tools["fabric"]="Fabric - Open-source AI augmentation framework"
+    ai_tools["codex"]="Codex CLI - OpenAI's terminal interface"
+    ai_tools["ollama"]="Ollama - Run AI models locally (free, private)"
+    
+    # Show installation options
+    local install_choices=""
+    
+    for tool in claude-code aider gemini warp fabric codex ollama; do
+        if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
+            echo -e "${YELLOW}$tool${NC}: ${ai_tools[$tool]}"
+            read -p "Install $tool? (y/N): " choice
+            if [[ $choice =~ ^[Yy]$ ]]; then
+                install_choices="$install_choices $tool"
+                success "✓ $tool selected for installation"
+            else
+                log "Skipped $tool"
+            fi
+            echo ""
+        fi
+    done
+    
+    if [ -z "$install_choices" ]; then
+        warn "No AI CLIs selected for installation"
+        echo ""
+        echo -e "${BLUE}💡 Recommendation: Install at least one AI CLI for NeuralSync functionality${NC}"
+        read -p "Install recommended Claude Code? (Y/n): " default_choice
+        if [[ ! $default_choice =~ ^[Nn]$ ]]; then
+            install_choices="claude-code"
+        fi
+    fi
+    
+    # Install selected AI CLIs
+    if [ ! -z "$install_choices" ]; then
+        echo ""
+        log "Installing selected AI CLIs: $install_choices"
+        
+        for tool in $install_choices; do
+            install_ai_cli "$tool"
+        done
+    fi
+}
+
+# Install specific AI CLI
+install_ai_cli() {
+    local tool="$1"
+    
+    case "$tool" in
+        "claude-code")
+            log "Installing Claude Code..."
+            case $OS_TYPE in
+                "macOS")
+                    if command_exists npm; then
+                        npm install -g @anthropic/claude-cli || {
+                            warn "npm install failed, trying direct download..."
+                            curl -fsSL https://raw.githubusercontent.com/anthropics/claude-cli/main/install.sh | bash
+                        }
+                    else
+                        curl -fsSL https://raw.githubusercontent.com/anthropics/claude-cli/main/install.sh | bash
+                    fi
+                    ;;
+                "Linux")
                     curl -fsSL https://raw.githubusercontent.com/anthropics/claude-cli/main/install.sh | bash
-                fi
-                ;;
-            "Linux")
-                curl -fsSL https://raw.githubusercontent.com/anthropics/claude-cli/main/install.sh | bash
-                ;;
-        esac
-        DETECTED_AIS="$DETECTED_AIS claude-code"
-    fi
+                    ;;
+            esac
+            DETECTED_AIS="$DETECTED_AIS claude-code"
+            ;;
+            
+        "aider")
+            log "Installing Aider (Terminal warrior's dream)..."
+            pip3 install --user aider-chat || {
+                warn "pip install failed, trying alternative..."
+                python3 -m pip install --user aider-chat
+            }
+            DETECTED_AIS="$DETECTED_AIS aider"
+            ;;
+            
+        "gemini")
+            log "Installing Gemini CLI (Google's open-source terminal agent)..."
+            case $OS_TYPE in
+                "macOS")
+                    if command_exists brew; then
+                        brew install gemini-cli || {
+                            warn "brew install failed, trying pip..."
+                            pip3 install --user gemini-cli
+                        }
+                    else
+                        pip3 install --user gemini-cli
+                    fi
+                    ;;
+                "Linux")
+                    pip3 install --user gemini-cli || {
+                        curl -fsSL https://raw.githubusercontent.com/google/gemini-cli/main/install.sh | bash
+                    }
+                    ;;
+            esac
+            DETECTED_AIS="$DETECTED_AIS gemini"
+            ;;
+            
+        "warp")
+            log "Installing Warp (Agentic development environment)..."
+            case $OS_TYPE in
+                "macOS")
+                    if command_exists brew; then
+                        brew install --cask warp || {
+                            warn "brew install failed, downloading directly..."
+                            curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
+                            log "Warp downloaded to /tmp/warp.dmg - please install manually"
+                        }
+                    else
+                        curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
+                        log "Warp downloaded to /tmp/warp.dmg - please install manually"
+                    fi
+                    ;;
+                "Linux")
+                    warn "Warp is not officially supported on Linux yet. Skipping..."
+                    return
+                    ;;
+            esac
+            DETECTED_AIS="$DETECTED_AIS warp"
+            ;;
+            
+        "fabric")
+            log "Installing Fabric (Open-source AI augmentation framework)..."
+            pip3 install --user fabric || {
+                warn "pip install failed, trying from source..."
+                git clone https://github.com/danielmiessler/fabric.git /tmp/fabric
+                cd /tmp/fabric && pip3 install --user . && cd "$HOME"
+                rm -rf /tmp/fabric
+            }
+            DETECTED_AIS="$DETECTED_AIS fabric"
+            ;;
+            
+        "codex")
+            log "Installing Codex CLI (OpenAI's terminal interface)..."
+            pip3 install --user openai-codex-cli || {
+                warn "openai-codex-cli not found, trying alternative..."
+                npm install -g @openai/codex-cli || {
+                    pip3 install --user codex-cli
+                }
+            }
+            DETECTED_AIS="$DETECTED_AIS codex"
+            ;;
+            
+        "ollama")
+            log "Installing Ollama (Run AI models locally)..."
+            case $OS_TYPE in
+                "macOS")
+                    if command_exists brew; then
+                        brew install ollama
+                    else
+                        curl -fsSL https://ollama.ai/install.sh | sh
+                    fi
+                    ;;
+                "Linux")
+                    curl -fsSL https://ollama.ai/install.sh | sh
+                    ;;
+            esac
+            
+            # Start Ollama service
+            log "Starting Ollama service..."
+            ollama serve &
+            sleep 5
+            
+            # Install a basic model
+            log "Installing Ollama model (llama2)..."
+            ollama pull llama2 || warn "Failed to pull model - you can do this later with: ollama pull llama2"
+            
+            DETECTED_AIS="$DETECTED_AIS ollama"
+            ;;
+            
+        *)
+            error "Unknown AI CLI: $tool"
+            ;;
+    esac
     
-    # Install CodexCLI if not available
-    if ! echo "$DETECTED_AIS" | grep -q "codexcli"; then
-        log "Installing CodexCLI..."
-        pip3 install --user openai-codex-cli || true
-    fi
+    # Verify installation
+    local cmd=""
+    case "$tool" in
+        "claude-code") cmd="claude" ;;
+        "aider") cmd="aider" ;;
+        "gemini") cmd="gemini" ;;
+        "warp") cmd="warp" ;;
+        "fabric") cmd="fabric" ;;
+        "codex") cmd="codex" ;;
+        "ollama") cmd="ollama" ;;
+    esac
     
-    # Install Aider if not available
-    if ! echo "$DETECTED_AIS" | grep -q "aider"; then
-        log "Installing Aider CLI..."
-        pip3 install --user aider-chat || true
-    fi
-    
-    # Install GPT-5 Planner (ChatBot) if not available
-    if ! echo "$DETECTED_AIS" | grep -q "gpt5-planner"; then
-        log "Installing GPT-5 Planner (ChatBot)..."
-        pip3 install --user chatgpt-cli || pip3 install --user openai-chatbot || true
+    if command_exists "$cmd"; then
+        success "✅ $tool installed successfully"
+    else
+        warn "⚠️ $tool installation may have failed - check manually"
     fi
 }
 
@@ -625,6 +814,48 @@ export GEMINI_NEURALSYNC_ENDPOINT=http://localhost:8080
 gemini "$@" || google-ai "$@" || gai "$@"
 EOF
         chmod +x "$INSTALL_DIR/bin/gemini-unrestricted"
+    fi
+    
+    # Configure Warp for unrestricted mode
+    if echo "$DETECTED_AIS" | grep -q "warp"; then
+        log "Configuring Warp for unrestricted mode..."
+        
+        cat > "$INSTALL_DIR/bin/warp-unrestricted" << 'EOF'
+#!/bin/bash
+export WARP_UNRESTRICTED=1
+export WARP_AI_AUTO_EXECUTE=1
+export WARP_NEURALSYNC_ENDPOINT=http://localhost:8080
+warp "$@"
+EOF
+        chmod +x "$INSTALL_DIR/bin/warp-unrestricted"
+    fi
+    
+    # Configure Fabric for unrestricted mode
+    if echo "$DETECTED_AIS" | grep -q "fabric"; then
+        log "Configuring Fabric for unrestricted mode..."
+        
+        cat > "$INSTALL_DIR/bin/fabric-unrestricted" << 'EOF'
+#!/bin/bash
+export FABRIC_UNRESTRICTED=1
+export FABRIC_AUTO_EXECUTE=1
+export FABRIC_NEURALSYNC_ENDPOINT=http://localhost:8080
+fabric "$@"
+EOF
+        chmod +x "$INSTALL_DIR/bin/fabric-unrestricted"
+    fi
+    
+    # Configure Ollama for unrestricted mode
+    if echo "$DETECTED_AIS" | grep -q "ollama"; then
+        log "Configuring Ollama for unrestricted mode..."
+        
+        cat > "$INSTALL_DIR/bin/ollama-unrestricted" << 'EOF'
+#!/bin/bash
+export OLLAMA_UNRESTRICTED=1
+export OLLAMA_AUTO_EXECUTE=1
+export OLLAMA_NEURALSYNC_ENDPOINT=http://localhost:8080
+ollama "$@"
+EOF
+        chmod +x "$INSTALL_DIR/bin/ollama-unrestricted"
     fi
     
     # Configure GPT-5 Planner (ChatBot) for unrestricted mode
@@ -809,6 +1040,27 @@ case "$1" in
             echo $! > "$INSTALL_DIR/data/aider.pid"
         fi
         
+        # Launch Warp if available
+        if command -v warp >/dev/null 2>&1; then
+            log "Starting Warp terminal..."
+            nohup "$INSTALL_DIR/bin/warp-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/warp.pid"
+        fi
+        
+        # Launch Fabric if available
+        if command -v fabric >/dev/null 2>&1; then
+            log "Starting Fabric..."
+            nohup "$INSTALL_DIR/bin/fabric-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/fabric.pid"
+        fi
+        
+        # Launch Ollama if available
+        if command -v ollama >/dev/null 2>&1; then
+            log "Starting Ollama..."
+            nohup "$INSTALL_DIR/bin/ollama-unrestricted" >/dev/null 2>&1 &
+            echo $! > "$INSTALL_DIR/data/ollama.pid"
+        fi
+        
         # Launch GPT-5 Planner (ChatBot) if available
         if command -v chatgpt >/dev/null 2>&1 || command -v gpt >/dev/null 2>&1; then
             log "Starting GPT-5 Planner (ChatBot)..."
@@ -934,21 +1186,36 @@ case "$1" in
                 log "Launching Gemini in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/gemini-unrestricted" "${@:2}"
                 ;;
+            warp)
+                log "Launching Warp in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/warp-unrestricted" "${@:2}"
+                ;;
+            fabric)
+                log "Launching Fabric in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/fabric-unrestricted" "${@:2}"
+                ;;
+            ollama)
+                log "Launching Ollama in unrestricted mode..."
+                exec "$INSTALL_DIR/bin/ollama-unrestricted" "${@:2}"
+                ;;
             gpt5-planner|chatgpt|planner)
                 log "Launching GPT-5 Planner (ChatBot) in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/gpt5-planner-unrestricted" "${@:2}"
                 ;;
             list)
-                echo -e "${BLUE}Available AI CLIs:${NC}"
-                command -v claude >/dev/null 2>&1 && echo -e "${GREEN}✅ claude (Claude Code)${NC}" || echo -e "${RED}❌ claude${NC}"
-                (command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1) && echo -e "${GREEN}✅ codex (CodexCLI)${NC}" || echo -e "${RED}❌ codex${NC}"
+                echo -e "${BLUE}Available AI CLIs (Elite Developer 2025 Edition):${NC}"
+                command -v claude >/dev/null 2>&1 && echo -e "${GREEN}✅ claude (Claude Code - Advanced Reasoning)${NC}" || echo -e "${RED}❌ claude${NC}"
+                command -v aider >/dev/null 2>&1 && echo -e "${GREEN}✅ aider (Terminal Warrior - Top SWE Bench)${NC}" || echo -e "${RED}❌ aider${NC}"
+                (command -v gemini >/dev/null 2>&1 || command -v google-ai >/dev/null 2>&1) && echo -e "${GREEN}✅ gemini (Google AI - 1M Context)${NC}" || echo -e "${RED}❌ gemini${NC}"
+                command -v warp >/dev/null 2>&1 && echo -e "${GREEN}✅ warp (Agentic Terminal)${NC}" || echo -e "${RED}❌ warp${NC}"
+                command -v fabric >/dev/null 2>&1 && echo -e "${GREEN}✅ fabric (AI Augmentation Framework)${NC}" || echo -e "${RED}❌ fabric${NC}"
+                (command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1) && echo -e "${GREEN}✅ codex (OpenAI Terminal)${NC}" || echo -e "${RED}❌ codex${NC}"
+                command -v ollama >/dev/null 2>&1 && echo -e "${GREEN}✅ ollama (Local AI Models)${NC}" || echo -e "${RED}❌ ollama${NC}"
                 command -v autopilot >/dev/null 2>&1 && echo -e "${GREEN}✅ autopilot (GitHub Copilot)${NC}" || echo -e "${RED}❌ autopilot${NC}"
-                command -v aider >/dev/null 2>&1 && echo -e "${GREEN}✅ aider (AI Pair Programming)${NC}" || echo -e "${RED}❌ aider${NC}"
-                (command -v gemini >/dev/null 2>&1 || command -v google-ai >/dev/null 2>&1) && echo -e "${GREEN}✅ gemini (Google AI)${NC}" || echo -e "${RED}❌ gemini${NC}"
                 (command -v chatgpt >/dev/null 2>&1 || command -v gpt >/dev/null 2>&1) && echo -e "${GREEN}✅ gpt5-planner (ChatBot)${NC}" || echo -e "${RED}❌ gpt5-planner${NC}"
                 ;;
             *) 
-                echo "Usage: neuralsync ai {claude|codex|autopilot|aider|gemini|gpt5-planner|list} [args]"
+                echo "Usage: neuralsync ai {claude|aider|gemini|warp|fabric|codex|ollama|autopilot|gpt5-planner|list} [args]"
                 echo "Use 'neuralsync ai list' to see available AI CLIs"
                 ;;
         esac
@@ -1004,12 +1271,31 @@ case "$1" in
                 log "Installing Aider..."
                 pip3 install --user aider-chat
                 ;;
+            warp)
+                log "Installing Warp terminal..."
+                case "$OS_TYPE" in
+                    "macOS")
+                        brew install --cask warp || curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
+                        ;;
+                    "Linux")
+                        warn "Warp is not officially supported on Linux yet"
+                        ;;
+                esac
+                ;;
+            fabric)
+                log "Installing Fabric..."
+                pip3 install --user fabric
+                ;;
+            ollama)
+                log "Installing Ollama..."
+                curl -fsSL https://ollama.ai/install.sh | sh
+                ;;
             gpt5-planner|chatgpt)
                 log "Installing GPT-5 Planner (ChatBot)..."
                 pip3 install --user chatgpt-cli
                 ;;
             *)
-                echo "Usage: neuralsync install-cli {claude|codex|aider|gpt5-planner}"
+                echo "Usage: neuralsync install-cli {claude|aider|gemini|warp|fabric|codex|ollama|gpt5-planner}"
                 ;;
         esac
         ;;
