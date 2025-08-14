@@ -198,14 +198,57 @@ install_system_dependencies() {
             
             # Install Docker if not available
             if ! $DOCKER_AVAILABLE; then
-                log "Installing Docker Desktop..."
-                brew install --cask docker
-                if [ "$INTERACTIVE_MODE" = "true" ]; then
-                    warn "Please start Docker Desktop manually and return to continue"
-                    read -p "Press Enter when Docker is running..." < /dev/tty
+                # Check if Docker Desktop is installed but not running
+                if [ -d "/Applications/Docker.app" ]; then
+                    log "Docker Desktop found but not running. Starting Docker..."
+                    open -a Docker
                 else
-                    warn "Docker Desktop installed but not started - run 'open /Applications/Docker.app' manually"
-                    log "Continuing installation without Docker for now..."
+                    log "Installing Docker Desktop..."
+                    brew install --cask docker
+                    
+                    # Automatically launch Docker Desktop after installation
+                    log "Launching Docker Desktop..."
+                    open -a Docker
+                fi
+                
+                # Wait for Docker to start with progress indicator  
+                update_status "Starting Docker Desktop..."
+                
+                local wait_count=0
+                local max_wait=120  # 2 minutes max wait
+                local dots=""
+                
+                while ! docker info >/dev/null 2>&1; do
+                    if [ $wait_count -ge $max_wait ]; then
+                        echo ""
+                        error "Docker failed to start within 2 minutes"
+                        if [ "$INTERACTIVE_MODE" = "true" ]; then
+                            warn "Please check Docker Desktop manually and press Enter when ready"
+                            read -p "Press Enter when Docker is running..." < /dev/tty
+                        else
+                            warn "Continuing without Docker - you may need to start it manually later"
+                        fi
+                        break
+                    fi
+                    
+                    # Show progress with dots and time
+                    dots="${dots}."
+                    if [ ${#dots} -gt 20 ]; then
+                        dots="."
+                    fi
+                    printf "\r${GREEN}[INFO]${NC} Docker starting${dots} (${wait_count}s)"
+                    
+                    sleep 3
+                    wait_count=$((wait_count + 3))
+                done
+                
+                if docker info >/dev/null 2>&1; then
+                    echo ""
+                    success "Docker Desktop is running and ready!"
+                    DOCKER_AVAILABLE=true
+                else
+                    echo ""
+                    warn "Docker may not be fully ready - continuing installation"
                 fi
             fi
             
