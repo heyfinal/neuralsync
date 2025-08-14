@@ -4,6 +4,11 @@
 # Auto-detects system, installs dependencies, configures AI CLIs
 # Supports: claude-code, codexcli, autopilot, aider, gemini-cli
 
+# Force bash execution if running in zsh
+if [ -n "$ZSH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -e
 
 # Error handling for piped execution
@@ -14,8 +19,14 @@ trap 'echo "⚠️ Installation interrupted. You can re-run the installer to con
 
 # Detect if running via curl pipe or interactive
 INTERACTIVE_MODE=true
-if [ "${NEURALSYNC_BATCH:-}" = "true" ] || [ ! -t 0 ] && [ ! -t 1 ]; then
+# Only use batch mode if explicitly requested OR if stdin AND stdout are both not terminals
+if [ "${NEURALSYNC_BATCH:-}" = "true" ] || { [ ! -t 0 ] && [ ! -t 1 ]; }; then
     INTERACTIVE_MODE=false
+fi
+
+# Override: if user can input and see output, force interactive
+if [ -t 0 ] && [ -t 1 ]; then
+    INTERACTIVE_MODE=true
 fi
 
 # Debug output for mode detection  
@@ -711,15 +722,19 @@ install_missing_ai_clis() {
     echo -e "${BLUE}Choose which AI CLIs to install (based on elite developer preferences 2025):${NC}"
     echo ""
     
-    # Define available AI tools with descriptions
-    declare -A ai_tools
-    ai_tools["claude-code"]="Claude Code - Anthropic's CLI with advanced reasoning"
-    ai_tools["aider"]="Aider - Terminal warrior's dream, top SWE Bench score"
-    ai_tools["gemini"]="Gemini CLI - Google's FREE terminal agent (1M token context, 60 req/min)"
-    ai_tools["warp"]="Warp - Agentic development environment terminal"
-    ai_tools["fabric"]="Fabric - Open-source AI augmentation framework"
-    ai_tools["codex"]="Codex CLI - OpenAI's terminal interface"
-    ai_tools["ollama"]="Ollama - Run AI models locally (free, private)"
+    # Define available AI tools with descriptions (shell-agnostic)
+    get_ai_tool_description() {
+        case "$1" in
+            "claude-code") echo "Claude Code - Anthropic's CLI with advanced reasoning" ;;
+            "aider") echo "Aider - Terminal warrior's dream, top SWE Bench score" ;;
+            "gemini") echo "Gemini CLI - Google's FREE terminal agent (1M token context, 60 req/min)" ;;
+            "warp") echo "Warp - Agentic development environment terminal" ;;
+            "fabric") echo "Fabric - Open-source AI augmentation framework" ;;
+            "codex") echo "Codex CLI - OpenAI's terminal interface" ;;
+            "ollama") echo "Ollama - Run AI models locally (free, private)" ;;
+            *) echo "Unknown AI tool" ;;
+        esac
+    }
     
     # Show installation options
     local install_choices=""
@@ -728,7 +743,7 @@ install_missing_ai_clis() {
         # Interactive mode - prompt for each tool
         for tool in claude-code aider gemini warp fabric codex ollama; do
             if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
-                echo -e "${YELLOW}$tool${NC}: ${ai_tools[$tool]}"
+                echo -e "${YELLOW}$tool${NC}: $(get_ai_tool_description "$tool")"
                 read -p "Install $tool? (y/N): " choice < /dev/tty
                 if [[ $choice =~ ^[Yy]$ ]]; then
                     install_choices="$install_choices $tool"
