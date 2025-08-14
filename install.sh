@@ -12,6 +12,20 @@ trap 'echo "❌ Installation failed at line $LINENO. Check the error above." >&2
 # Handle interrupted installation  
 trap 'echo "⚠️ Installation interrupted. You can re-run the installer to continue." >&2; exit 1' INT TERM
 
+# Detect if running via curl pipe or interactive
+INTERACTIVE_MODE=true
+if [ "${NEURALSYNC_BATCH:-}" = "true" ] || [ ! -t 0 ] && [ ! -t 1 ]; then
+    INTERACTIVE_MODE=false
+fi
+
+# Debug output for mode detection  
+if [ "$INTERACTIVE_MODE" = "true" ]; then
+    echo "🎮 Interactive mode detected - will prompt for user input"
+    echo "💡 Tip: Set NEURALSYNC_BATCH=true for automated installs"
+else
+    echo "🤖 Batch mode detected - using smart defaults"
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -128,7 +142,7 @@ install_system_dependencies() {
             if ! $DOCKER_AVAILABLE; then
                 log "Installing Docker Desktop..."
                 brew install --cask docker
-                if [ -t 0 ]; then
+                if [ "$INTERACTIVE_MODE" = "true" ]; then
                     warn "Please start Docker Desktop manually and return to continue"
                     read -p "Press Enter when Docker is running..." < /dev/tty
                 else
@@ -174,8 +188,8 @@ get_user_preferences() {
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
     
-    # Check if we can read from terminal (not piped)
-    if [ -t 0 ]; then
+    # Check if we should prompt for user input
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         # Terminal input available - interactive mode
         echo -e "${BLUE}👋 Personal Information${NC}"
         echo "NeuralSync AIs will address you personally by name for better interaction."
@@ -226,7 +240,7 @@ get_user_preferences() {
     echo "3) Hybrid Mode - Real-time sync with manual handoff capability"
     echo ""
     
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         read -p "Select sync mode (1-3, default: 3): " sync_mode < /dev/tty
     else
         sync_mode=3
@@ -257,7 +271,7 @@ get_user_preferences() {
     fi
     echo ""
     
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         read -p "Do you want to configure NAS storage? (y/N): " configure_nas < /dev/tty
     else
         configure_nas="n"
@@ -269,7 +283,7 @@ get_user_preferences() {
         echo "1) Direct mount point (e.g., /Volumes/MyNAS, /mnt/nas)"
         echo "2) IP address with credentials"
         
-        if [ -t 0 ]; then
+        if [ "$INTERACTIVE_MODE" = "true" ]; then
             read -p "Enter choice (1-2): " nas_choice < /dev/tty
         else
             nas_choice=1
@@ -278,7 +292,7 @@ get_user_preferences() {
         
         case $nas_choice in
             1)
-                if [ -t 0 ]; then
+                if [ "$INTERACTIVE_MODE" = "true" ]; then
                     read -p "Enter NAS mount point path: " NAS_MOUNT_POINT < /dev/tty
                     if [ ! -d "$NAS_MOUNT_POINT" ]; then
                         warn "Mount point $NAS_MOUNT_POINT does not exist. You can configure this later."
@@ -291,7 +305,7 @@ get_user_preferences() {
                 fi
                 ;;
             2)
-                if [ -t 0 ]; then
+                if [ "$INTERACTIVE_MODE" = "true" ]; then
                     read -p "Enter NAS IP address: " NAS_IP < /dev/tty
                     read -p "Enter NAS username: " NAS_USERNAME < /dev/tty
                     read -s -p "Enter NAS password: " NAS_PASSWORD < /dev/tty
@@ -320,7 +334,7 @@ get_user_preferences() {
     echo "  • ~/.config/ directories"
     echo "  • Project-specific AI config files"
     echo ""
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         read -p "Scan and compile AI configuration files? (y/N): " scan_consent < /dev/tty
         if [[ $scan_consent =~ ^[Yy]$ ]]; then
             SCAN_AI_CONFIGS=true
@@ -606,7 +620,7 @@ install_missing_ai_clis() {
     # Show installation options
     local install_choices=""
     
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         # Interactive mode - prompt for each tool
         for tool in claude-code aider gemini warp fabric codex ollama; do
             if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
@@ -1640,7 +1654,7 @@ EOF
     echo "Configure API keys for AI providers (optional but recommended):"
     echo ""
     
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key < /dev/tty
         if [ ! -z "$openai_key" ]; then
             sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
@@ -1682,7 +1696,7 @@ final_setup_with_autostart() {
     echo "  • Launch detected AI agents in the background"
     echo "  • Verify everything is working"
     echo ""
-    if [ -t 0 ]; then
+    if [ "$INTERACTIVE_MODE" = "true" ]; then
         read -p "Auto-start NeuralSync now? (Y/n): " auto_start < /dev/tty
     else
         auto_start="y"
