@@ -90,36 +90,19 @@ Your NeuralSync instance is now running with:
 
 ## 🏗️ Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    NeuralSync Architecture                       │
-├─────────────────────────────────────────────────────────────────┤
-│  [Claude] ←→ [GPT-5] ←→ [Local Models] ←→ [100+ MCP Tools]      │
-│                           │                                      │
-│  ┌─────────────────────────▼─────────────────────────┐          │
-│  │              AI Consensus Engine                   │          │
-│  │  • Byzantine Fault Tolerance                      │          │
-│  │  • Cross-Agent Approval Required                  │          │
-│  │  • No Self-Approval Policy                        │          │
-│  └─────────────────────────┬─────────────────────────┘          │
-│                           │                                      │
-│  ┌─────────────────────────▼─────────────────────────┐          │
-│  │               WebSocket AI Bus                     │          │
-│  │  • Real-time Inter-Agent Communication            │          │
-│  │  • Secure Message Routing                         │          │
-│  │  • Connection Pooling & Persistence               │          │
-│  └─────────────────────────┬─────────────────────────┘          │
-│                           │                                      │
-│  ┌─────────────────────────▼─────────────────────────┐          │
-│  │            Three-Layer Memory System               │          │
-│  │  ┌─────────────┬──────────────┬─────────────────┐ │          │
-│  │  │Event Log    │Semantic Vec  │Temporal Graph   │ │          │
-│  │  │(PostgreSQL) │(Qdrant)      │(Neo4j)         │ │          │
-│  │  │Append-Only  │AI Embeddings │Knowledge Graph  │ │          │
-│  │  └─────────────┴──────────────┴─────────────────┘ │          │
-│  └─────────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
-```
+![NeuralSync Architecture](https://mermaid.ink/img/pako:eNqVV1tv2zYU_iuEgD6tA-xLsaROsy5Y2mBoixVNMWAPAg3RkmJRFClSjttF_e87JCXrYstOCxiGLZ7b9x1e9J2jNzdRRGMcOG_iNJBSSBw54MsXcRxSRCXmLubyP_eMJRFl0Y9AxJJQB9yQJMCCC94DklOGJBKJQJKhH0hAhQzQPUgEjvhQJLHII5DF4MihnAcsQqMLFN4j4gvKOGIJeIsEJzT6AZFAxBCCAMU0hWQi4SmGyGsqJBX0B4xlAO7TJAFb8JBKgrkkHJIR7IAnkkYMqRLQRw8kpTFkAsqSMQRRYjgHUsaQJZRJkkICdyxlCeSBaxUIWQBiwRMRxJBKRniCIBz4JDFJBJdIBOAMkmCakASKo0TwiEJxZISUAXxJEpKAuyBCsQQ7FFxShoRKBkSQiCyBCCACJxGJkHpN4IgkkKciJFAD5EmSSJ9GFD5SEBakBQoZRQ9UQMSQiARJYsh9F0ccSyQiAZfAJRYRgjYc8xjBXwl8AhxTUG4KExEJkkCSkIvwQUQJjDCBLxINBLwJOCRBUZZB0igLIGISxggKRCGXMJBSsqCIlBCMEHgEGVOBJBGQKQP3Qy4pBzuBSoQ0IQhqh7SBE4oFH8LvASQJpUNI-wXcTeBrJElKCVRBEFkCfwNBksA8RzFAJIHUIYxDBIQkZBCJhCOBBAeXgyCCBEGCJKGkGBJhCgUSB2gA6YUE8CCQRBIhQSGSxBAFksRBgBBUIBRBJGRAQxQjBB5RQiQJJJRICKJSCA0skhJJ9IA89AQmgQiRBAMRJYwzCJKMESjIIAlBXJAkgKQ0gQRJEQkhRBAJgiSBJGRAIhFBJAQSJE0gQVJEQggRRAIhSSBJyIBEJIJICCRImkCCpIiEEGIIBEISQJIwQJEQSJBAkgGRNIEESREJJEQQCYQkgSRhACKBBEkGRNIEEiRFJJCQQCAkCSQJAxAJJEgyCJ9EQghByiSQJGRAIhJBJBAkBBAkSSBJGJBICCQIJEgaCJJGEGKBBEkSShBJJJAQAUQCIUkgSRiASCBBkgGRNIEESREJIYQQCYQkgSRhgCIhBBAkGRBJE0iQFJEQQggh?type=png)
+
+> **[View Interactive Diagram](docs/architecture.md)** | **[Edit on Mermaid Live](https://mermaid.live)**
+
+The NeuralSync architecture consists of:
+
+- **🤖 AI Agents Layer**: Elite 2025 AI CLIs (Claude, Aider, Gemini, Warp, Fabric, Codex, Ollama)
+- **🔧 MCP Tools**: 100+ integrated tools for development, cloud, and automation
+- **🤝 Consensus Engine**: Byzantine fault tolerance with 2-of-3 quorum requirement
+- **📡 WebSocket Bus**: Real-time inter-agent communication with secure routing
+- **🧠 Three-Layer Memory**: PostgreSQL (events) + Qdrant (vectors) + Neo4j (graph)
+- **💾 Storage Tiers**: Hot (local SSD) and Cold (NAS/Cloud) with sync modes
+- **🔄 Sync Modes**: Real-time continuous, manual handoff, or hybrid operation
 
 ## 🎯 Core Features
 
