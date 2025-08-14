@@ -429,8 +429,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **Anthropic** for Claude and the inspiration for multi-AI coordination
-- **OpenAI** for GPT models and the MCP standard
 - **The Open Source Community** for the amazing tools that make this possible
 
 ---
