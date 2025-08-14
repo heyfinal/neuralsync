@@ -4,11 +4,6 @@
 # Auto-detects system, installs dependencies, configures AI CLIs
 # Supports: claude-code, codexcli, autopilot, aider, gemini-cli
 
-# Force bash execution if running in zsh
-if [ -n "$ZSH_VERSION" ]; then
-    exec bash "$0" "$@"
-fi
-
 set -e
 
 # Error handling for piped execution
@@ -19,40 +14,22 @@ trap 'echo "⚠️ Installation interrupted. You can re-run the installer to con
 
 # Detect if running via curl pipe or interactive
 INTERACTIVE_MODE=true
-# Only use batch mode if explicitly requested OR if stdin AND stdout are both not terminals
-if [ "${NEURALSYNC_BATCH:-}" = "true" ] || { [ ! -t 0 ] && [ ! -t 1 ]; }; then
+if [ "${NEURALSYNC_BATCH:-}" = "true" ] || [ ! -t 0 ] && [ ! -t 1 ]; then
     INTERACTIVE_MODE=false
 fi
 
-# Override: if user can input and see output, force interactive
-if [ -t 0 ] && [ -t 1 ]; then
-    INTERACTIVE_MODE=true
-fi
-
-# Debug output for mode detection  
-if [ "$INTERACTIVE_MODE" = "true" ]; then
-    echo "🎮 Interactive mode detected - will prompt for user input"
-    echo "💡 Tip: Set NEURALSYNC_BATCH=true for automated installs"
-else
-    echo "🤖 Batch mode detected - using smart defaults"
-fi
-
-# Terminal setup and colors
-
-# Colors for output (enhanced for black background)
-RED='\033[1;31m'
-GREEN='\033[1;32m'
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[1;34m'
-PURPLE='\033[1;35m'
-CYAN='\033[1;36m'
-WHITE='\033[1;37m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Simple banner function
-show_banner() {
-    echo -e "${CYAN}"
-    cat << 'EOF'
+# Banner
+echo -e "${CYAN}"
+cat << 'EOF'
 :::.    :::..,::::::  ...    ::::::::::..    :::.      :::     
 `;;;;,  `;;;;;;;''''  ;;     ;;;;;;;``;;;;   ;;`;;     ;;;     
   [[[[[. '[[ [[cccc  [['     [[[ [[[,/[[['  ,[[ '[[,   [[[     
@@ -69,11 +46,7 @@ show_banner() {
         NeuralSync One-Click Installer v1.0
         Distributed AI Memory & Orchestration Platform
 EOF
-    echo -e "${NC}"
-}
-
-# Show initial banner
-show_banner
+echo -e "${NC}"
 
 # Global variables
 OS_TYPE=""
@@ -93,33 +66,7 @@ NEURALSYNC_ADMIN_USER=""
 NEURALSYNC_ADMIN_PASS=""
 NEURALSYNC_SYNC_MODE=""
 
-# Progress tracking
-CURRENT_STEP=0
-TOTAL_STEPS=12
-CURRENT_TASK=""
-
-# Update status - simplified without cursor positioning
-update_status() {
-    local task="$1"
-    CURRENT_TASK="$task"
-    CURRENT_STEP=$((CURRENT_STEP + 1))
-    
-    # Show simple progress
-    local progress=$((CURRENT_STEP * 20 / TOTAL_STEPS))
-    local bar=""
-    for i in $(seq 1 20); do
-        if [ $i -le $progress ]; then
-            bar="${bar}█"
-        else
-            bar="${bar}░"
-        fi
-    done
-    
-    echo -e "${CYAN}Progress: ${YELLOW}[$bar] ${WHITE}($CURRENT_STEP/$TOTAL_STEPS)${NC}"
-    echo -e "${WHITE}Current: ${CYAN}$task${NC}"
-}
-
-# Simple logging functions
+# Logging function
 log() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -138,7 +85,7 @@ success() {
 
 # Detect operating system
 detect_os() {
-    update_status "Detecting operating system..."
+    log "Detecting operating system..."
     case "$(uname -s)" in
         Linux*)     OS_TYPE="Linux";;
         Darwin*)    OS_TYPE="macOS";;
@@ -171,7 +118,7 @@ detect_package_managers() {
 
 # Install system dependencies
 install_system_dependencies() {
-    update_status "Installing system dependencies..."
+    log "Installing system dependencies..."
     
     case $OS_TYPE in
         "macOS")
@@ -185,57 +132,14 @@ install_system_dependencies() {
             
             # Install Docker if not available
             if ! $DOCKER_AVAILABLE; then
-                # Check if Docker Desktop is installed but not running
-                if [ -d "/Applications/Docker.app" ]; then
-                    log "Docker Desktop found but not running. Starting Docker..."
-                    open -a Docker
+                log "Installing Docker Desktop..."
+                brew install --cask docker
+                if [ -t 0 ]; then
+                    warn "Please start Docker Desktop manually and return to continue"
+                    read -p "Press Enter when Docker is running..." < /dev/tty
                 else
-                    log "Installing Docker Desktop..."
-                    brew install --cask docker
-                    
-                    # Automatically launch Docker Desktop after installation
-                    log "Launching Docker Desktop..."
-                    open -a Docker
-                fi
-                
-                # Wait for Docker to start with progress indicator  
-                update_status "Starting Docker Desktop..."
-                
-                local wait_count=0
-                local max_wait=120  # 2 minutes max wait
-                local dots=""
-                
-                while ! docker info >/dev/null 2>&1; do
-                    if [ $wait_count -ge $max_wait ]; then
-                        echo ""
-                        error "Docker failed to start within 2 minutes"
-                        if [ "$INTERACTIVE_MODE" = "true" ]; then
-                            warn "Please check Docker Desktop manually and press Enter when ready"
-                            read -p "Press Enter when Docker is running..." < /dev/tty
-                        else
-                            warn "Continuing without Docker - you may need to start it manually later"
-                        fi
-                        break
-                    fi
-                    
-                    # Show progress with dots and time
-                    dots="${dots}."
-                    if [ ${#dots} -gt 20 ]; then
-                        dots="."
-                    fi
-                    printf "\r${GREEN}[INFO]${NC} Docker starting${dots} (${wait_count}s)"
-                    
-                    sleep 3
-                    wait_count=$((wait_count + 3))
-                done
-                
-                if docker info >/dev/null 2>&1; then
-                    echo ""
-                    success "Docker Desktop is running and ready!"
-                    DOCKER_AVAILABLE=true
-                else
-                    echo ""
-                    warn "Docker may not be fully ready - continuing installation"
+                    warn "Docker Desktop installed but not started - run 'open /Applications/Docker.app' manually"
+                    log "Continuing installation without Docker for now..."
                 fi
             fi
             
@@ -271,7 +175,6 @@ install_system_dependencies() {
 
 # Get user information and preferences
 get_user_preferences() {
-    update_status "Getting user preferences..."
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${PURPLE}🎯 NeuralSync Personal Configuration${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
@@ -329,7 +232,7 @@ get_user_preferences() {
     echo "3) Hybrid Mode - Real-time sync with manual handoff capability"
     echo ""
     
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         read -p "Select sync mode (1-3, default: 3): " sync_mode < /dev/tty
     else
         sync_mode=3
@@ -360,7 +263,7 @@ get_user_preferences() {
     fi
     echo ""
     
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         read -p "Do you want to configure NAS storage? (y/N): " configure_nas < /dev/tty
     else
         configure_nas="n"
@@ -372,7 +275,7 @@ get_user_preferences() {
         echo "1) Direct mount point (e.g., /Volumes/MyNAS, /mnt/nas)"
         echo "2) IP address with credentials"
         
-        if [ "$INTERACTIVE_MODE" = "true" ]; then
+        if [ -t 0 ]; then
             read -p "Enter choice (1-2): " nas_choice < /dev/tty
         else
             nas_choice=1
@@ -381,7 +284,7 @@ get_user_preferences() {
         
         case $nas_choice in
             1)
-                if [ "$INTERACTIVE_MODE" = "true" ]; then
+                if [ -t 0 ]; then
                     read -p "Enter NAS mount point path: " NAS_MOUNT_POINT < /dev/tty
                     if [ ! -d "$NAS_MOUNT_POINT" ]; then
                         warn "Mount point $NAS_MOUNT_POINT does not exist. You can configure this later."
@@ -394,7 +297,7 @@ get_user_preferences() {
                 fi
                 ;;
             2)
-                if [ "$INTERACTIVE_MODE" = "true" ]; then
+                if [ -t 0 ]; then
                     read -p "Enter NAS IP address: " NAS_IP < /dev/tty
                     read -p "Enter NAS username: " NAS_USERNAME < /dev/tty
                     read -s -p "Enter NAS password: " NAS_PASSWORD < /dev/tty
@@ -423,7 +326,7 @@ get_user_preferences() {
     echo "  • ~/.config/ directories"
     echo "  • Project-specific AI config files"
     echo ""
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         read -p "Scan and compile AI configuration files? (y/N): " scan_consent < /dev/tty
         if [[ $scan_consent =~ ^[Yy]$ ]]; then
             SCAN_AI_CONFIGS=true
@@ -440,7 +343,6 @@ get_user_preferences() {
 
 # Scan for existing AI configuration files
 scan_ai_configurations() {
-    update_status "Scanning AI configurations..."
     if [ "$SCAN_AI_CONFIGS" = false ]; then
         return
     fi
@@ -619,7 +521,7 @@ EOF
 
 # Detect available AI CLIs
 detect_ai_clis() {
-    update_status "Detecting AI CLIs..."
+    log "Detecting available AI CLIs..."
     DETECTED_AIS=""
     
     # Claude Code
@@ -685,7 +587,6 @@ detect_ai_clis() {
 
 # Interactive AI CLI installation menu
 install_missing_ai_clis() {
-    update_status "Installing AI CLIs..."
     if [ ! -z "$DETECTED_AIS" ]; then
         log "Found existing AI CLIs: $DETECTED_AIS"
         echo ""
@@ -698,28 +599,24 @@ install_missing_ai_clis() {
     echo -e "${BLUE}Choose which AI CLIs to install (based on elite developer preferences 2025):${NC}"
     echo ""
     
-    # Define available AI tools with descriptions (shell-agnostic)
-    get_ai_tool_description() {
-        case "$1" in
-            "claude-code") echo "Claude Code - Anthropic's CLI with advanced reasoning" ;;
-            "aider") echo "Aider - Terminal warrior's dream, top SWE Bench score" ;;
-            "gemini") echo "Gemini CLI - Google's FREE terminal agent (1M token context, 60 req/min)" ;;
-            "warp") echo "Warp - Agentic development environment terminal" ;;
-            "fabric") echo "Fabric - Open-source AI augmentation framework" ;;
-            "codex") echo "Codex CLI - OpenAI's terminal interface" ;;
-            "ollama") echo "Ollama - Run AI models locally (free, private)" ;;
-            *) echo "Unknown AI tool" ;;
-        esac
-    }
+    # Define available AI tools with descriptions
+    declare -A ai_tools
+    ai_tools["claude-code"]="Claude Code - Anthropic's CLI with advanced reasoning"
+    ai_tools["aider"]="Aider - Terminal warrior's dream, top SWE Bench score"
+    ai_tools["gemini"]="Gemini CLI - Google's FREE terminal agent (1M token context, 60 req/min)"
+    ai_tools["warp"]="Warp - Agentic development environment terminal"
+    ai_tools["fabric"]="Fabric - Open-source AI augmentation framework"
+    ai_tools["codex"]="Codex CLI - OpenAI's terminal interface"
+    ai_tools["ollama"]="Ollama - Run AI models locally (free, private)"
     
     # Show installation options
     local install_choices=""
     
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         # Interactive mode - prompt for each tool
         for tool in claude-code aider gemini warp fabric codex ollama; do
             if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
-                echo -e "${YELLOW}$tool${NC}: $(get_ai_tool_description "$tool")"
+                echo -e "${YELLOW}$tool${NC}: ${ai_tools[$tool]}"
                 read -p "Install $tool? (y/N): " choice < /dev/tty
                 if [[ $choice =~ ^[Yy]$ ]]; then
                     install_choices="$install_choices $tool"
@@ -799,27 +696,10 @@ install_ai_cli() {
             
         "aider")
             log "Installing Aider (Terminal warrior's dream)..."
-            
-            # Use pipx for isolated installation
-            if command_exists pipx; then
-                pipx install aider-chat
-            elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
-                brew install pipx
-                pipx install aider-chat
-            else
-                # Use virtual environment
-                log "Creating virtual environment for aider..."
-                python3 -m venv "$INSTALL_DIR/venv_aider"
-                "$INSTALL_DIR/venv_aider/bin/pip" install aider-chat
-                
-                # Create wrapper script
-                cat > "$INSTALL_DIR/bin/aider" << EOF
-#!/bin/bash
-"$INSTALL_DIR/venv_aider/bin/aider" "\$@"
-EOF
-                chmod +x "$INSTALL_DIR/bin/aider"
-            fi
+            pip3 install --user aider-chat || {
+                warn "pip install failed, trying alternative..."
+                python3 -m pip install --user aider-chat
+            }
             DETECTED_AIS="$DETECTED_AIS aider"
             ;;
             
@@ -876,67 +756,23 @@ EOF
             
         "fabric")
             log "Installing Fabric (Open-source AI augmentation framework)..."
-            
-            # Use pipx for isolated installation
-            if command_exists pipx; then
-                pipx install fabric
-            elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
-                brew install pipx
-                pipx install fabric
-            else
-                # Use virtual environment
-                log "Creating virtual environment for fabric..."
-                python3 -m venv "$INSTALL_DIR/venv_fabric"
-                "$INSTALL_DIR/venv_fabric/bin/pip" install fabric || {
-                    warn "pip install failed, trying from source..."
-                    git clone https://github.com/danielmiessler/fabric.git /tmp/fabric
-                    cd /tmp/fabric && "$INSTALL_DIR/venv_fabric/bin/pip" install . && cd "$HOME"
-                    rm -rf /tmp/fabric
-                }
-                
-                # Create wrapper script
-                cat > "$INSTALL_DIR/bin/fabric" << EOF
-#!/bin/bash
-"$INSTALL_DIR/venv_fabric/bin/fabric" "\$@"
-EOF
-                chmod +x "$INSTALL_DIR/bin/fabric"
-            fi
+            pip3 install --user fabric || {
+                warn "pip install failed, trying from source..."
+                git clone https://github.com/danielmiessler/fabric.git /tmp/fabric
+                cd /tmp/fabric && pip3 install --user . && cd "$HOME"
+                rm -rf /tmp/fabric
+            }
             DETECTED_AIS="$DETECTED_AIS fabric"
             ;;
             
         "codex")
             log "Installing Codex CLI (OpenAI's terminal interface)..."
-            
-            # Use pipx for isolated installation
-            if command_exists pipx; then
-                pipx install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    pipx install codex-cli
+            pip3 install --user openai-codex-cli || {
+                warn "openai-codex-cli not found, trying alternative..."
+                npm install -g @openai/codex-cli || {
+                    pip3 install --user codex-cli
                 }
-            elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
-                brew install pipx
-                pipx install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    pipx install codex-cli
-                }
-            else
-                # Use virtual environment
-                log "Creating virtual environment for codex..."
-                python3 -m venv "$INSTALL_DIR/venv_codex"
-                "$INSTALL_DIR/venv_codex/bin/pip" install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    "$INSTALL_DIR/venv_codex/bin/pip" install codex-cli
-                }
-                
-                # Create wrapper script
-                cat > "$INSTALL_DIR/bin/codex" << EOF
-#!/bin/bash
-"$INSTALL_DIR/venv_codex/bin/codex" "\$@"
-EOF
-                chmod +x "$INSTALL_DIR/bin/codex"
-            fi
+            }
             DETECTED_AIS="$DETECTED_AIS codex"
             ;;
             
@@ -1158,8 +994,7 @@ EOF
 
 # Create Python virtual environment
 create_python_venv() {
-    update_status "Creating Python virtual environment..."
-    log "Creating isolated Python virtual environment for NeuralSync..."
+    log "Creating Python virtual environment..."
     
     if [ ! -d "$VENV_DIR" ]; then
         python3 -m venv "$VENV_DIR"
@@ -1169,10 +1004,9 @@ create_python_venv() {
     pip install --upgrade pip
     
     # Install Python dependencies for NeuralSync
-    log "Installing NeuralSync Python dependencies..."
     pip install fastapi uvicorn[standard] pydantic qdrant-client psycopg[binary] py2neo openai tiktoken python-jose[cryptography] websockets watchdog
     
-    success "Python virtual environment created at $VENV_DIR"
+    log "Python virtual environment created at $VENV_DIR"
 }
 
 # Create directory structure
@@ -1187,7 +1021,7 @@ create_directory_structure() {
 
 # Clone and setup NeuralSync from GitHub
 clone_and_setup_neuralsync() {
-    update_status "Setting up NeuralSync..."
+    log "Cloning NeuralSync from GitHub..."
     
     # Check if we're already in a neuralsync directory or if files exist locally
     if [ -f "docker-compose.yml" ] && [ -d "services" ] && [ -d "bus" ]; then
@@ -1550,19 +1384,11 @@ case "$1" in
                 ;;
             codex)
                 log "Installing CodexCLI..."
-                if command -v pipx >/dev/null 2>&1; then
-                    pipx install openai-codex-cli
-                else
-                    brew install pipx && pipx install openai-codex-cli
-                fi
+                pip3 install --user openai-codex-cli
                 ;;
             aider)
                 log "Installing Aider..."
-                if command -v pipx >/dev/null 2>&1; then
-                    pipx install aider-chat
-                else
-                    brew install pipx && pipx install aider-chat
-                fi
+                pip3 install --user aider-chat
                 ;;
             warp)
                 log "Installing Warp terminal..."
@@ -1577,11 +1403,7 @@ case "$1" in
                 ;;
             fabric)
                 log "Installing Fabric..."
-                if command -v pipx >/dev/null 2>&1; then
-                    pipx install fabric
-                else
-                    brew install pipx && pipx install fabric
-                fi
+                pip3 install --user fabric
                 ;;
             ollama)
                 log "Installing Ollama..."
@@ -1589,11 +1411,7 @@ case "$1" in
                 ;;
             gpt5-planner|chatgpt)
                 log "Installing GPT-5 Planner (ChatBot)..."
-                if command -v pipx >/dev/null 2>&1; then
-                    pipx install chatgpt-cli
-                else
-                    brew install pipx && pipx install chatgpt-cli
-                fi
+                pip3 install --user chatgpt-cli
                 ;;
             *)
                 echo "Usage: neuralsync install-cli {claude|aider|gemini|warp|fabric|codex|ollama|gpt5-planner}"
@@ -1787,7 +1605,7 @@ setup_path() {
 
 # Configure environment variables
 configure_environment() {
-    update_status "Configuring environment..."
+    log "Configuring environment variables..."
     
     # Generate API token
     API_TOKEN=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
@@ -1828,7 +1646,7 @@ EOF
     echo "Configure API keys for AI providers (optional but recommended):"
     echo ""
     
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key < /dev/tty
         if [ ! -z "$openai_key" ]; then
             sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
@@ -1852,7 +1670,7 @@ EOF
 
 # Final setup with auto-start capability
 final_setup_with_autostart() {
-    update_status "Finalizing installation..."
+    log "Performing final setup..."
     
     cd "$INSTALL_DIR"
     
@@ -1870,7 +1688,7 @@ final_setup_with_autostart() {
     echo "  • Launch detected AI agents in the background"
     echo "  • Verify everything is working"
     echo ""
-    if [ "$INTERACTIVE_MODE" = "true" ]; then
+    if [ -t 0 ]; then
         read -p "Auto-start NeuralSync now? (Y/n): " auto_start < /dev/tty
     else
         auto_start="y"
@@ -1930,12 +1748,6 @@ main() {
     
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    update_status "Installation complete!"
-    
-    # Show final banner without clearing screen
-    echo ""
-    show_banner
-    
     echo -e "${GREEN}🎉 NeuralSync Installation Complete! 🎉${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
@@ -1952,19 +1764,7 @@ main() {
     echo -e "${GREEN}Restart your terminal or run:${NC} source ~/.bashrc"
     echo ""
     echo -e "${CYAN}Happy AI orchestration! 🤖${NC}"
-    
-    # Restore terminal settings
-    printf '\033[0m'  # Reset all attributes
 }
-
-# Cleanup function for interruptions
-cleanup() {
-    printf '\033[0m'  # Reset all attributes  
-    echo "Installation interrupted. Terminal restored."
-}
-
-# Set cleanup trap
-trap cleanup EXIT INT TERM
 
 # Run installation
 main "$@"
