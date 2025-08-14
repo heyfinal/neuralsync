@@ -6,6 +6,12 @@
 
 set -e
 
+# Error handling for piped execution
+trap 'echo "❌ Installation failed at line $LINENO. Check the error above." >&2; exit 1' ERR
+
+# Handle interrupted installation  
+trap 'echo "⚠️ Installation interrupted. You can re-run the installer to continue." >&2; exit 1' INT TERM
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -122,8 +128,13 @@ install_system_dependencies() {
             if ! $DOCKER_AVAILABLE; then
                 log "Installing Docker Desktop..."
                 brew install --cask docker
-                warn "Please start Docker Desktop manually and return to continue"
-                read -p "Press Enter when Docker is running..."
+                if [ -t 0 ]; then
+                    warn "Please start Docker Desktop manually and return to continue"
+                    read -p "Press Enter when Docker is running..." < /dev/tty
+                else
+                    warn "Docker Desktop installed but not started - run 'open /Applications/Docker.app' manually"
+                    log "Continuing installation without Docker for now..."
+                fi
             fi
             
             # Install Python and other dependencies
@@ -163,36 +174,48 @@ get_user_preferences() {
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
     
-    # Get user's name
-    echo -e "${BLUE}👋 Personal Information${NC}"
-    echo "NeuralSync AIs will address you personally by name for better interaction."
-    read -p "What's your name? (e.g., Daniel, Sarah): " USER_NAME
-    if [ -z "$USER_NAME" ]; then
-        USER_NAME="User"
-    fi
-    log "Hello $USER_NAME! Setting up personalized AI experience..."
-    echo ""
-    
-    # NeuralSync admin credentials
-    echo -e "${BLUE}🔐 Admin Account Setup${NC}"
-    echo "Create admin credentials for NeuralSync configuration and memory access."
-    read -p "Choose admin username (default: admin): " admin_user
-    NEURALSYNC_ADMIN_USER=${admin_user:-admin}
-    
-    while true; do
-        read -s -p "Create admin password: " admin_pass1
-        echo ""
-        read -s -p "Confirm admin password: " admin_pass2
-        echo ""
-        if [ "$admin_pass1" = "$admin_pass2" ]; then
-            NEURALSYNC_ADMIN_PASS="$admin_pass1"
-            break
-        else
-            error "Passwords don't match. Please try again."
+    # Check if we can read from terminal (not piped)
+    if [ -t 0 ]; then
+        # Terminal input available - interactive mode
+        echo -e "${BLUE}👋 Personal Information${NC}"
+        echo "NeuralSync AIs will address you personally by name for better interaction."
+        read -p "What's your name? (e.g., Daniel, Sarah): " USER_NAME < /dev/tty
+        if [ -z "$USER_NAME" ]; then
+            USER_NAME="User"
         fi
-    done
-    success "Admin account configured for $NEURALSYNC_ADMIN_USER"
-    echo ""
+        log "Hello $USER_NAME! Setting up personalized AI experience..."
+        echo ""
+        
+        # NeuralSync admin credentials
+        echo -e "${BLUE}🔐 Admin Account Setup${NC}"
+        echo "Create admin credentials for NeuralSync configuration and memory access."
+        read -p "Choose admin username (default: admin): " admin_user < /dev/tty
+        NEURALSYNC_ADMIN_USER=${admin_user:-admin}
+        
+        while true; do
+            read -s -p "Create admin password: " admin_pass1 < /dev/tty
+            echo ""
+            read -s -p "Confirm admin password: " admin_pass2 < /dev/tty
+            echo ""
+            if [ "$admin_pass1" = "$admin_pass2" ]; then
+                NEURALSYNC_ADMIN_PASS="$admin_pass1"
+                break
+            else
+                error "Passwords don't match. Please try again."
+            fi
+        done
+        success "Admin account configured for $NEURALSYNC_ADMIN_USER"
+        echo ""
+    else
+        # Piped mode - use defaults
+        warn "Running in piped mode - using default configuration"
+        USER_NAME="User"
+        NEURALSYNC_ADMIN_USER="admin"
+        NEURALSYNC_ADMIN_PASS="neuralsync123"
+        log "Hello $USER_NAME! Setting up personalized AI experience with defaults..."
+        log "Default admin account: $NEURALSYNC_ADMIN_USER (password: neuralsync123)"
+        echo ""
+    fi
     
     # Sync Mode Configuration
     echo -e "${BLUE}🔄 Memory Sync Mode Configuration${NC}"
@@ -202,7 +225,14 @@ get_user_preferences() {
     echo "2) Manual Handoff - Export/import memory bundles between devices"
     echo "3) Hybrid Mode - Real-time sync with manual handoff capability"
     echo ""
-    read -p "Select sync mode (1-3, default: 3): " sync_mode
+    
+    if [ -t 0 ]; then
+        read -p "Select sync mode (1-3, default: 3): " sync_mode < /dev/tty
+    else
+        sync_mode=3
+        log "Using default sync mode: Hybrid"
+    fi
+    
     case ${sync_mode:-3} in
         1)
             NEURALSYNC_SYNC_MODE="realtime"
@@ -226,29 +256,50 @@ get_user_preferences() {
         echo -e "${YELLOW}Note: NAS is recommended for real-time sync mode${NC}"
     fi
     echo ""
-    read -p "Do you want to configure NAS storage? (y/N): " configure_nas
+    
+    if [ -t 0 ]; then
+        read -p "Do you want to configure NAS storage? (y/N): " configure_nas < /dev/tty
+    else
+        configure_nas="n"
+        log "Skipping NAS configuration in piped mode"
+    fi
     if [[ $configure_nas =~ ^[Yy]$ ]]; then
         echo ""
         echo "Choose NAS configuration method:"
         echo "1) Direct mount point (e.g., /Volumes/MyNAS, /mnt/nas)"
         echo "2) IP address with credentials"
-        read -p "Enter choice (1-2): " nas_choice
+        
+        if [ -t 0 ]; then
+            read -p "Enter choice (1-2): " nas_choice < /dev/tty
+        else
+            nas_choice=1
+            log "Using default NAS method: mount point"
+        fi
         
         case $nas_choice in
             1)
-                read -p "Enter NAS mount point path: " NAS_MOUNT_POINT
-                if [ ! -d "$NAS_MOUNT_POINT" ]; then
-                    warn "Mount point $NAS_MOUNT_POINT does not exist. You can configure this later."
+                if [ -t 0 ]; then
+                    read -p "Enter NAS mount point path: " NAS_MOUNT_POINT < /dev/tty
+                    if [ ! -d "$NAS_MOUNT_POINT" ]; then
+                        warn "Mount point $NAS_MOUNT_POINT does not exist. You can configure this later."
+                    else
+                        success "NAS mount point configured: $NAS_MOUNT_POINT"
+                    fi
                 else
-                    success "NAS mount point configured: $NAS_MOUNT_POINT"
+                    NAS_MOUNT_POINT="/Volumes/NAS"
+                    log "Default NAS mount point: $NAS_MOUNT_POINT (configure later if needed)"
                 fi
                 ;;
             2)
-                read -p "Enter NAS IP address: " NAS_IP
-                read -p "Enter NAS username: " NAS_USERNAME
-                read -s -p "Enter NAS password: " NAS_PASSWORD
-                echo ""
-                success "NAS credentials configured for $NAS_IP"
+                if [ -t 0 ]; then
+                    read -p "Enter NAS IP address: " NAS_IP < /dev/tty
+                    read -p "Enter NAS username: " NAS_USERNAME < /dev/tty
+                    read -s -p "Enter NAS password: " NAS_PASSWORD < /dev/tty
+                    echo ""
+                    success "NAS credentials configured for $NAS_IP"
+                else
+                    log "NAS IP configuration requires interactive mode - skipping"
+                fi
                 ;;
         esac
     else
@@ -269,12 +320,17 @@ get_user_preferences() {
     echo "  • ~/.config/ directories"
     echo "  • Project-specific AI config files"
     echo ""
-    read -p "Scan and compile AI configuration files? (y/N): " scan_consent
-    if [[ $scan_consent =~ ^[Yy]$ ]]; then
-        SCAN_AI_CONFIGS=true
-        log "Will scan for AI configuration files"
+    if [ -t 0 ]; then
+        read -p "Scan and compile AI configuration files? (y/N): " scan_consent < /dev/tty
+        if [[ $scan_consent =~ ^[Yy]$ ]]; then
+            SCAN_AI_CONFIGS=true
+            log "Will scan for AI configuration files"
+        else
+            log "Skipping AI config file scanning"
+        fi
     else
-        log "Skipping AI config file scanning"
+        SCAN_AI_CONFIGS=true
+        log "Auto-enabling AI config scanning in piped mode"
     fi
     echo ""
 }
@@ -550,28 +606,50 @@ install_missing_ai_clis() {
     # Show installation options
     local install_choices=""
     
-    for tool in claude-code aider gemini warp fabric codex ollama; do
-        if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
-            echo -e "${YELLOW}$tool${NC}: ${ai_tools[$tool]}"
-            read -p "Install $tool? (y/N): " choice
-            if [[ $choice =~ ^[Yy]$ ]]; then
-                install_choices="$install_choices $tool"
-                success "✓ $tool selected for installation"
-            else
-                log "Skipped $tool"
+    if [ -t 0 ]; then
+        # Interactive mode - prompt for each tool
+        for tool in claude-code aider gemini warp fabric codex ollama; do
+            if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
+                echo -e "${YELLOW}$tool${NC}: ${ai_tools[$tool]}"
+                read -p "Install $tool? (y/N): " choice < /dev/tty
+                if [[ $choice =~ ^[Yy]$ ]]; then
+                    install_choices="$install_choices $tool"
+                    success "✓ $tool selected for installation"
+                else
+                    log "Skipped $tool"
+                fi
+                echo ""
             fi
+        done
+        
+        if [ -z "$install_choices" ]; then
+            warn "No AI CLIs selected for installation"
             echo ""
+            echo -e "${BLUE}💡 Recommendation: Install at least one AI CLI for NeuralSync functionality${NC}"
+            read -p "Install recommended Claude Code? (Y/n): " default_choice < /dev/tty
+            if [[ ! $default_choice =~ ^[Nn]$ ]]; then
+                install_choices="claude-code"
+            fi
         fi
-    done
-    
-    if [ -z "$install_choices" ]; then
-        warn "No AI CLIs selected for installation"
-        echo ""
-        echo -e "${BLUE}💡 Recommendation: Install at least one AI CLI for NeuralSync functionality${NC}"
-        read -p "Install recommended Claude Code? (Y/n): " default_choice
-        if [[ ! $default_choice =~ ^[Nn]$ ]]; then
-            install_choices="claude-code"
-        fi
+    else
+        # Piped mode - install essential free tools
+        log "Running in piped mode - installing essential free AI CLIs..."
+        for tool in claude-code aider gemini warp fabric codex ollama; do
+            if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
+                case $tool in
+                    "gemini"|"aider"|"ollama"|"fabric")
+                        # Install free tools automatically
+                        install_choices="$install_choices $tool"
+                        log "✓ Auto-selected $tool (free tool)"
+                        ;;
+                    "claude-code")
+                        # Install Claude Code as primary tool
+                        install_choices="$install_choices $tool"
+                        log "✓ Auto-selected $tool (primary CLI)"
+                        ;;
+                esac
+            fi
+        done
     fi
     
     # Install selected AI CLIs
@@ -1562,19 +1640,23 @@ EOF
     echo "Configure API keys for AI providers (optional but recommended):"
     echo ""
     
-    read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key
-    if [ ! -z "$openai_key" ]; then
-        sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
-    fi
-    
-    read -p "Enter Anthropic API Key (optional, press Enter to skip): " anthropic_key
-    if [ ! -z "$anthropic_key" ]; then
-        echo "ANTHROPIC_API_KEY=$anthropic_key" >> "$INSTALL_DIR/.env"
-    fi
-    
-    read -p "Enter Google AI API Key (optional, press Enter to skip): " google_key
-    if [ ! -z "$google_key" ]; then
-        echo "GOOGLE_AI_API_KEY=$google_key" >> "$INSTALL_DIR/.env"
+    if [ -t 0 ]; then
+        read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key < /dev/tty
+        if [ ! -z "$openai_key" ]; then
+            sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
+        fi
+        
+        read -p "Enter Anthropic API Key (optional, press Enter to skip): " anthropic_key < /dev/tty
+        if [ ! -z "$anthropic_key" ]; then
+            echo "ANTHROPIC_API_KEY=$anthropic_key" >> "$INSTALL_DIR/.env"
+        fi
+        
+        read -p "Enter Google AI API Key (optional, press Enter to skip): " google_key < /dev/tty
+        if [ ! -z "$google_key" ]; then
+            echo "GOOGLE_AI_API_KEY=$google_key" >> "$INSTALL_DIR/.env"
+        fi
+    else
+        log "Skipping API key configuration in piped mode - configure later with: neuralsync config"
     fi
     
     success "Environment configured with personalized settings"
@@ -1600,7 +1682,12 @@ final_setup_with_autostart() {
     echo "  • Launch detected AI agents in the background"
     echo "  • Verify everything is working"
     echo ""
-    read -p "Auto-start NeuralSync now? (Y/n): " auto_start
+    if [ -t 0 ]; then
+        read -p "Auto-start NeuralSync now? (Y/n): " auto_start < /dev/tty
+    else
+        auto_start="y"
+        log "Auto-starting NeuralSync in piped mode"
+    fi
     
     if [[ ! $auto_start =~ ^[Nn]$ ]]; then
         log "Auto-starting NeuralSync with all detected AI agents..."
