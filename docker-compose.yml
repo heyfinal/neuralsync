@@ -45,7 +45,7 @@ services:
       retries: 30
 
   redpanda:
-    image: redpanda/redpanda:latest
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.6
     container_name: ns-redpanda
     command:
       - redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M --check=false

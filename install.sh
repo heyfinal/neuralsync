@@ -49,6 +49,18 @@ CYAN='\033[1;36m'
 WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
+# Banner configuration
+BANNER_HEIGHT=15
+SUPPORTS_SCROLL_REGION=false
+
+# Detect terminal capabilities
+detect_terminal_capabilities() {
+    # Check for scroll region support
+    if [[ "$TERM" =~ ^(xterm|screen|tmux) ]]; then
+        SUPPORTS_SCROLL_REGION=true
+    fi
+}
+
 # Simple banner function
 show_banner() {
     echo -e "${CYAN}"
@@ -72,8 +84,42 @@ EOF
     echo -e "${NC}"
 }
 
-# Show initial banner
-show_banner
+# Setup terminal for banner preservation
+setup_banner_terminal() {
+    detect_terminal_capabilities
+    
+    if $SUPPORTS_SCROLL_REGION; then
+        # Use scroll region to preserve banner
+        clear
+        show_banner
+        
+        # Set scroll region below banner (start at line 16)
+        printf '\033[%d;%dr' $((BANNER_HEIGHT + 1)) $(tput lines 2>/dev/null || echo 24)
+        
+        # Position cursor at start of scroll region
+        printf '\033[%d;1H' $((BANNER_HEIGHT + 1))
+        
+        log "Using scroll region method for banner preservation"
+    else
+        # Fallback: just show banner normally
+        show_banner
+        log "Terminal doesn't support scroll regions - using simple banner display"
+    fi
+}
+
+# Cleanup terminal
+cleanup_banner() {
+    if $SUPPORTS_SCROLL_REGION; then
+        # Reset scroll region to full screen
+        printf '\033[r'
+    fi
+    
+    # Reset terminal attributes
+    printf '\033[0m'
+}
+
+# Setup terminal with banner preservation
+setup_banner_terminal
 
 # Global variables
 OS_TYPE=""
@@ -735,9 +781,15 @@ install_missing_ai_clis() {
             warn "No AI CLIs selected for installation"
             echo ""
             echo -e "${BLUE}💡 Recommendation: Install at least one AI CLI for NeuralSync functionality${NC}"
-            read -p "Install recommended Claude Code? (Y/n): " default_choice < /dev/tty
-            if [[ ! $default_choice =~ ^[Nn]$ ]]; then
-                install_choices="claude-code"
+            
+            # Check if Claude Code is already installed
+            if echo "$DETECTED_AIS" | grep -q "claude-code"; then
+                log "Claude Code is already installed and detected"
+            else
+                read -p "Install recommended Claude Code? (Y/n): " default_choice < /dev/tty
+                if [[ ! $default_choice =~ ^[Nn]$ ]]; then
+                    install_choices="claude-code"
+                fi
             fi
         fi
     else
@@ -1822,26 +1874,40 @@ EOF
         echo "NEURALSYNC_NAS_PASSWORD=\"$NAS_PASSWORD\"" >> "$INSTALL_DIR/.env"
     fi
     
-    # Ask for AI API keys
+    # Ask for AI API keys only for installed/detected tools
     echo ""
     echo -e "${BLUE}🔑 AI Provider API Keys${NC}"
-    echo "Configure API keys for AI providers (optional but recommended):"
+    echo "Configure API keys for detected AI providers (optional but recommended):"
     echo ""
     
     if [ "$INTERACTIVE_MODE" = "true" ]; then
-        read -p "Enter OpenAI API Key (optional, press Enter to skip): " openai_key < /dev/tty
-        if [ ! -z "$openai_key" ]; then
-            sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
+        # Only ask for OpenAI key if OpenAI-based tools are detected
+        if echo "$DETECTED_AIS" | grep -q -E "(codex|gpt5-planner)"; then
+            read -p "Enter OpenAI API Key (for Codex/GPT tools, optional): " openai_key < /dev/tty
+            if [ ! -z "$openai_key" ]; then
+                sed -i.bak "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$openai_key/" "$INSTALL_DIR/.env"
+            fi
         fi
         
-        read -p "Enter Anthropic API Key (optional, press Enter to skip): " anthropic_key < /dev/tty
-        if [ ! -z "$anthropic_key" ]; then
-            echo "ANTHROPIC_API_KEY=$anthropic_key" >> "$INSTALL_DIR/.env"
+        # Only ask for Anthropic key if Claude is detected
+        if echo "$DETECTED_AIS" | grep -q "claude-code"; then
+            read -p "Enter Anthropic API Key (for Claude Code, optional): " anthropic_key < /dev/tty
+            if [ ! -z "$anthropic_key" ]; then
+                echo "ANTHROPIC_API_KEY=$anthropic_key" >> "$INSTALL_DIR/.env"
+            fi
         fi
         
-        read -p "Enter Google AI API Key (optional, press Enter to skip): " google_key < /dev/tty
-        if [ ! -z "$google_key" ]; then
-            echo "GOOGLE_AI_API_KEY=$google_key" >> "$INSTALL_DIR/.env"
+        # Only ask for Google key if Gemini is detected
+        if echo "$DETECTED_AIS" | grep -q "gemini"; then
+            read -p "Enter Google AI API Key (for Gemini CLI, optional): " google_key < /dev/tty
+            if [ ! -z "$google_key" ]; then
+                echo "GOOGLE_AI_API_KEY=$google_key" >> "$INSTALL_DIR/.env"
+            fi
+        fi
+        
+        # If no AI tools detected, skip API key configuration
+        if [ -z "$DETECTED_AIS" ]; then
+            log "No AI tools detected - skipping API key configuration"
         fi
     else
         log "Skipping API key configuration in piped mode - configure later with: neuralsync config"
@@ -1954,12 +2020,12 @@ main() {
     echo -e "${CYAN}Happy AI orchestration! 🤖${NC}"
     
     # Restore terminal settings
-    printf '\033[0m'  # Reset all attributes
+    cleanup_banner
 }
 
 # Cleanup function for interruptions
 cleanup() {
-    printf '\033[0m'  # Reset all attributes  
+    cleanup_banner
     echo "Installation interrupted. Terminal restored."
 }
 
