@@ -32,16 +32,26 @@
 
 ## 📋 Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- 4GB+ RAM recommended
-- API keys for AI providers (optional)
+### 🚀 One-Click Installation (Recommended)
 
-### Installation
+```bash
+# Install NeuralSync with interactive setup
+curl -fsSL https://raw.githubusercontent.com/heyfinal/neuralsync/main/install.sh | bash
+```
+
+This will:
+- 🤖 Detect and install AI CLIs (Claude, Aider, Gemini, Warp, Fabric, Codex, Ollama)
+- 👋 Personalize setup with your name and preferences
+- 🔄 Configure sync mode (real-time, handoff, or hybrid)
+- 💾 Set up NAS storage (optional)
+- 🔍 Scan and compile existing AI configurations
+- ✅ Auto-start all services and AI agents
+
+### Manual Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/neuralsync.git
+git clone https://github.com/heyfinal/neuralsync.git
 cd neuralsync
 
 # Copy environment template
