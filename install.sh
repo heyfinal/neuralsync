@@ -475,7 +475,7 @@ detect_ai_clis() {
     fi
     
     # Gemini CLI - Google's open-source terminal agent
-    if command_exists gemini || command_exists google-ai || command_exists gai; then
+    if command_exists gemini; then
         DETECTED_AIS="$DETECTED_AIS gemini"
         log "✓ Gemini CLI detected"
     fi
@@ -541,7 +541,7 @@ install_missing_ai_clis() {
     declare -A ai_tools
     ai_tools["claude-code"]="Claude Code - Anthropic's CLI with advanced reasoning"
     ai_tools["aider"]="Aider - Terminal warrior's dream, top SWE Bench score"
-    ai_tools["gemini"]="Gemini CLI - Google's open-source terminal agent (1M token context)"
+    ai_tools["gemini"]="Gemini CLI - Google's FREE terminal agent (1M token context, 60 req/min)"
     ai_tools["warp"]="Warp - Agentic development environment terminal"
     ai_tools["fabric"]="Fabric - Open-source AI augmentation framework"
     ai_tools["codex"]="Codex CLI - OpenAI's terminal interface"
@@ -621,23 +621,29 @@ install_ai_cli() {
             
         "gemini")
             log "Installing Gemini CLI (Google's open-source terminal agent)..."
-            case $OS_TYPE in
-                "macOS")
-                    if command_exists brew; then
-                        brew install gemini-cli || {
-                            warn "brew install failed, trying pip..."
-                            pip3 install --user gemini-cli
-                        }
-                    else
-                        pip3 install --user gemini-cli
-                    fi
-                    ;;
-                "Linux")
-                    pip3 install --user gemini-cli || {
-                        curl -fsSL https://raw.githubusercontent.com/google/gemini-cli/main/install.sh | bash
-                    }
-                    ;;
-            esac
+            if command_exists npm; then
+                npm install -g @google/gemini-cli || {
+                    warn "Global npm install failed, trying without sudo..."
+                    sudo npm install -g @google/gemini-cli
+                }
+            else
+                log "Installing Node.js first..."
+                case $OS_TYPE in
+                    "macOS")
+                        if command_exists brew; then
+                            brew install node
+                        else
+                            curl -fsSL https://nodejs.org/dist/v20.11.0/node-v20.11.0.pkg -o /tmp/node.pkg
+                            sudo installer -pkg /tmp/node.pkg -target /
+                        fi
+                        ;;
+                    "Linux")
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                        sudo apt-get install -y nodejs
+                        ;;
+                esac
+                npm install -g @google/gemini-cli
+            fi
             DETECTED_AIS="$DETECTED_AIS gemini"
             ;;
             
@@ -1235,7 +1241,7 @@ case "$1" in
                 echo -e "${BLUE}Available AI CLIs (Elite Developer 2025 Edition):${NC}"
                 command -v claude >/dev/null 2>&1 && echo -e "${GREEN}✅ claude (Claude Code - Advanced Reasoning)${NC}" || echo -e "${RED}❌ claude${NC}"
                 command -v aider >/dev/null 2>&1 && echo -e "${GREEN}✅ aider (Terminal Warrior - Top SWE Bench)${NC}" || echo -e "${RED}❌ aider${NC}"
-                (command -v gemini >/dev/null 2>&1 || command -v google-ai >/dev/null 2>&1) && echo -e "${GREEN}✅ gemini (Google AI - 1M Context)${NC}" || echo -e "${RED}❌ gemini${NC}"
+                command -v gemini >/dev/null 2>&1 && echo -e "${GREEN}✅ gemini (Google AI - FREE, 1M Context)${NC}" || echo -e "${RED}❌ gemini${NC}"
                 command -v warp >/dev/null 2>&1 && echo -e "${GREEN}✅ warp (Agentic Terminal)${NC}" || echo -e "${RED}❌ warp${NC}"
                 command -v fabric >/dev/null 2>&1 && echo -e "${GREEN}✅ fabric (AI Augmentation Framework)${NC}" || echo -e "${RED}❌ fabric${NC}"
                 (command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1) && echo -e "${GREEN}✅ codex (OpenAI Terminal)${NC}" || echo -e "${RED}❌ codex${NC}"
@@ -1608,6 +1614,7 @@ final_setup_with_autostart() {
         echo -e "${GREEN}🎯 Quick Commands:${NC}"
         echo -e "  ${BLUE}neuralsync status${NC}      - Check system status"
         echo -e "  ${BLUE}neuralsync ai claude${NC}   - Launch Claude Code"
+        echo -e "  ${BLUE}neuralsync ai gemini${NC}   - Launch Gemini CLI (FREE)"
         echo -e "  ${BLUE}neuralsync ai list${NC}     - Show available AIs"
         echo -e "  ${BLUE}neuralsync health${NC}      - Full system health check"
         
