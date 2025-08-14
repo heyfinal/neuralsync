@@ -26,35 +26,47 @@ else
     echo "🤖 Batch mode detected - using smart defaults"
 fi
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
+# Terminal setup and colors
+# Set terminal to black background and clear screen
+printf '\033[40m'  # Set background to black
+printf '\033[2J'   # Clear entire screen
+printf '\033[H'    # Move cursor to home position
+
+# Colors for output (enhanced for black background)
+RED='\033[1;31m'
+GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
+BLUE='\033[1;34m'
+PURPLE='\033[1;35m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
-# Banner
-echo -e "${CYAN}"
-cat << 'EOF'
-:::.    :::..,::::::  ...    ::::::::::..    :::.      :::     
-`;;;;,  `;;;;;;;''''  ;;     ;;;;;;;``;;;;   ;;`;;     ;;;     
-  [[[[[. '[[ [[cccc  [['     [[[ [[[,/[[['  ,[[ '[[,   [[[     
-  $$$ "Y$c$$ $$""""  $$      $$$ $$$$$$c   c$$$cc$$$c  $$'     
-  888    Y88 888oo,__88    .d888 888b "88bo,888   888,o88oo,.__
-  MMM     YM """"YUMMM"YmmMMMM"" MMMM   "W" YMM   ""` """"YUMMM
-                 .::::::..-:.     ::-.:::.    :::.  .,-:::::   
-                ;;;`    ` ';;.   ;;;;'`;;;;,  `;;;,;;;'````'   
-                '[==/[[[[,  '[[,[[['    [[[[[. '[[[[[          
-                  '''    $    c$$"      $$$ "Y$c$$$$$          
-                 88b    dP  ,8P"`       888    Y88`88bo,__,o,  
-                  "YMmMY"  mM"          MMM     YM  "YUMMMMMP"
+# Create persistent banner function
+show_banner() {
+    printf '\033[H'  # Move cursor to top
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${YELLOW}   :::.    :::..,::::::  ...    ::::::::::..    :::.      :::              ${CYAN}║${NC}"
+    echo -e "${CYAN}║${YELLOW}   \`;;;;,  \`;;;;;;;''''  ;;     ;;;;;;;;\`\`;;;;   ;;\`;;     ;;;              ${CYAN}║${NC}"
+    echo -e "${CYAN}║${YELLOW}     [[[[[. '[[ [[cccc  [['     [[[ [[[,/[[['  ,[[ '[[,   [[[              ${CYAN}║${NC}"
+    echo -e "${CYAN}║${YELLOW}     \$$\$ \"Y\$c\$\$ \$\$\"\"\"\"  \$\$      \$\$\$ \$\$\$\$\$\$c   c\$\$\$cc\$\$\$c  \$\$'              ${CYAN}║${NC}"
+    echo -e "${CYAN}║${YELLOW}     888    Y88 888oo,__88    .d888 888b \"88bo,888   888,o88oo,.__         ${CYAN}║${NC}"
+    echo -e "${CYAN}║${YELLOW}     MMM     YM \"\"\"\"YUMMM\"YmmMMMM\"\" MMMM   \"W\" YMM   \"\"\` \"\"\"\"YUMMM         ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                      .::::::..-:.     ::-.:::.    :::.  .,-:::::            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                     ;;;\`    \` ';;.   ;;;;'\`;;;;,  \`;;;,;;;'\`\`\`\`'            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                     '[==/[[[[,  '[[,[[['    [[[[[. '[[[[[               ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                       '''    \$    c\$\$\"      \$\$\$ \"Y\$c\$\$\$\$\$               ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                      88b    dP  ,8P\"\`       888    Y88\`88bo,__,o,       ${CYAN}║${NC}"
+    echo -e "${CYAN}║${PURPLE}                       \"YMmMY\"  mM\"          MMM     YM  \"YUMMMMMP\"       ${CYAN}║${NC}"
+    echo -e "${CYAN}║                                                                               ║${NC}"
+    echo -e "${CYAN}║${WHITE}               NeuralSync One-Click Installer v1.0                          ${CYAN}║${NC}"
+    echo -e "${CYAN}║${WHITE}           Distributed AI Memory & Orchestration Platform                   ${CYAN}║${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
 
-        NeuralSync One-Click Installer v1.0
-        Distributed AI Memory & Orchestration Platform
-EOF
-echo -e "${NC}"
+# Show initial banner
+show_banner
 
 # Global variables
 OS_TYPE=""
@@ -74,26 +86,72 @@ NEURALSYNC_ADMIN_USER=""
 NEURALSYNC_ADMIN_PASS=""
 NEURALSYNC_SYNC_MODE=""
 
-# Logging function
+# Progress tracking
+CURRENT_STEP=0
+TOTAL_STEPS=12
+CURRENT_TASK=""
+
+# Update status in terminal
+update_status() {
+    local task="$1"
+    CURRENT_TASK="$task"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    
+    # Move to status area (line 19)
+    printf '\033[19;1H'
+    printf '\033[2K'  # Clear line
+    
+    # Show progress bar
+    local progress=$((CURRENT_STEP * 50 / TOTAL_STEPS))
+    local bar="["
+    for i in $(seq 1 50); do
+        if [ $i -le $progress ]; then
+            bar="${bar}█"
+        else
+            bar="${bar}░"
+        fi
+    done
+    bar="${bar}]"
+    
+    echo -e "${CYAN}Progress: ${YELLOW}$bar ${WHITE}($CURRENT_STEP/$TOTAL_STEPS)${NC}"
+    printf '\033[20;1H'
+    printf '\033[2K'  # Clear line
+    echo -e "${WHITE}Current: ${CYAN}$task${NC}"
+    printf '\033[22;1H'  # Move to log area
+}
+
+# Enhanced logging functions with banner preservation
 log() {
+    printf '\033[s'  # Save cursor position
+    printf '\033[23;1H'  # Move to log area
     echo -e "${GREEN}[INFO]${NC} $1"
+    printf '\033[u'  # Restore cursor position
 }
 
 warn() {
+    printf '\033[s'  # Save cursor position  
+    printf '\033[23;1H'  # Move to log area
     echo -e "${YELLOW}[WARN]${NC} $1"
+    printf '\033[u'  # Restore cursor position
 }
 
 error() {
+    printf '\033[s'  # Save cursor position
+    printf '\033[23;1H'  # Move to log area  
     echo -e "${RED}[ERROR]${NC} $1"
+    printf '\033[u'  # Restore cursor position
 }
 
 success() {
+    printf '\033[s'  # Save cursor position
+    printf '\033[23;1H'  # Move to log area
     echo -e "${PURPLE}[SUCCESS]${NC} $1"
+    printf '\033[u'  # Restore cursor position
 }
 
 # Detect operating system
 detect_os() {
-    log "Detecting operating system..."
+    update_status "Detecting operating system..."
     case "$(uname -s)" in
         Linux*)     OS_TYPE="Linux";;
         Darwin*)    OS_TYPE="macOS";;
@@ -126,7 +184,7 @@ detect_package_managers() {
 
 # Install system dependencies
 install_system_dependencies() {
-    log "Installing system dependencies..."
+    update_status "Installing system dependencies..."
     
     case $OS_TYPE in
         "macOS")
@@ -183,6 +241,7 @@ install_system_dependencies() {
 
 # Get user information and preferences
 get_user_preferences() {
+    update_status "Getting user preferences..."
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${PURPLE}🎯 NeuralSync Personal Configuration${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
@@ -351,6 +410,7 @@ get_user_preferences() {
 
 # Scan for existing AI configuration files
 scan_ai_configurations() {
+    update_status "Scanning AI configurations..."
     if [ "$SCAN_AI_CONFIGS" = false ]; then
         return
     fi
@@ -529,7 +589,7 @@ EOF
 
 # Detect available AI CLIs
 detect_ai_clis() {
-    log "Detecting available AI CLIs..."
+    update_status "Detecting AI CLIs..."
     DETECTED_AIS=""
     
     # Claude Code
@@ -595,6 +655,7 @@ detect_ai_clis() {
 
 # Interactive AI CLI installation menu
 install_missing_ai_clis() {
+    update_status "Installing AI CLIs..."
     if [ ! -z "$DETECTED_AIS" ]; then
         log "Found existing AI CLIs: $DETECTED_AIS"
         echo ""
@@ -1029,7 +1090,7 @@ create_directory_structure() {
 
 # Clone and setup NeuralSync from GitHub
 clone_and_setup_neuralsync() {
-    log "Cloning NeuralSync from GitHub..."
+    update_status "Setting up NeuralSync..."
     
     # Check if we're already in a neuralsync directory or if files exist locally
     if [ -f "docker-compose.yml" ] && [ -d "services" ] && [ -d "bus" ]; then
@@ -1613,7 +1674,7 @@ setup_path() {
 
 # Configure environment variables
 configure_environment() {
-    log "Configuring environment variables..."
+    update_status "Configuring environment..."
     
     # Generate API token
     API_TOKEN=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
@@ -1678,7 +1739,7 @@ EOF
 
 # Final setup with auto-start capability
 final_setup_with_autostart() {
-    log "Performing final setup..."
+    update_status "Finalizing installation..."
     
     cd "$INSTALL_DIR"
     
@@ -1756,6 +1817,14 @@ main() {
     
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    update_status "Installation complete!"
+    sleep 2
+    
+    # Clear screen and show final banner
+    printf '\033[2J\033[H'
+    show_banner
+    printf '\033[18;1H'
+    
     echo -e "${GREEN}🎉 NeuralSync Installation Complete! 🎉${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
@@ -1772,7 +1841,22 @@ main() {
     echo -e "${GREEN}Restart your terminal or run:${NC} source ~/.bashrc"
     echo ""
     echo -e "${CYAN}Happy AI orchestration! 🤖${NC}"
+    
+    # Restore terminal settings
+    printf '\033[0m'  # Reset all attributes
+    printf '\033[49m' # Reset background color
 }
+
+# Cleanup function for interruptions
+cleanup() {
+    printf '\033[0m'  # Reset all attributes  
+    printf '\033[49m' # Reset background color
+    printf '\033[2J\033[H' # Clear screen
+    echo "Installation interrupted. Terminal restored."
+}
+
+# Set cleanup trap
+trap cleanup EXIT INT TERM
 
 # Run installation
 main "$@"
