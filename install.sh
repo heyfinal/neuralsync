@@ -19,7 +19,8 @@ if [ -z "$BASH_VERSION" ]; then
     fi
 fi
 
-set -e
+# Don't use set -e as it causes premature exit in piped execution
+# set -e
 
 # Error handling for piped execution
 trap 'echo "❌ Installation failed at line $LINENO. Check the error above." >&2; exit 1' ERR
