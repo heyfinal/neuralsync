@@ -9,6 +9,16 @@ if [ -n "$ZSH_VERSION" ]; then
     exec bash "$0" "$@"
 fi
 
+# Ensure we're running in bash for function compatibility
+if [ -z "$BASH_VERSION" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    else
+        echo "Error: This script requires bash but it's not available"
+        exit 1
+    fi
+fi
+
 set -e
 
 # Error handling for piped execution
@@ -65,6 +75,11 @@ log_error() {
 log_success() {
     echo -e "${PURPLE}[SUCCESS]${NC} $1"
 }
+
+# Aliases for compatibility
+success() { log_success "$@"; }
+warn() { log_warn "$@"; }
+error() { log_error "$@"; }
 
 # Banner configuration
 BANNER_HEIGHT=15
@@ -135,8 +150,8 @@ cleanup_banner() {
     printf '\033[0m'
 }
 
-# Setup terminal with banner preservation
-setup_banner_terminal
+# Setup terminal with banner preservation (moved after all function definitions)
+# This will be called later in main() to ensure all functions are defined
 
 # Global variables
 OS_TYPE=""
@@ -342,15 +357,19 @@ get_user_preferences() {
         NEURALSYNC_ADMIN_USER=${admin_user:-admin}
         
         while true; do
-            read -s -p "Create admin password: " admin_pass1 < /dev/tty
+            printf "Create admin password: "
+            read -s admin_pass1 < /dev/tty
             echo ""
-            read -s -p "Confirm admin password: " admin_pass2 < /dev/tty
+            printf "Confirm admin password: "
+            read -s admin_pass2 < /dev/tty
             echo ""
-            if [ "$admin_pass1" = "$admin_pass2" ]; then
+            if [ "$admin_pass1" = "$admin_pass2" ] && [ -n "$admin_pass1" ]; then
                 NEURALSYNC_ADMIN_PASS="$admin_pass1"
                 break
+            elif [ -z "$admin_pass1" ]; then
+                log_error "Password cannot be empty. Please try again."
             else
-                error "Passwords don't match. Please try again."
+                log_error "Passwords don't match. Please try again."
             fi
         done
         success "Admin account configured for $NEURALSYNC_ADMIN_USER"
@@ -1976,6 +1995,9 @@ final_setup_with_autostart() {
 
 # Main installation flow
 main() {
+    # Setup terminal with banner first - now all functions are defined
+    setup_banner_terminal
+    
     log_info "Starting NeuralSync installation..."
     
     detect_os
@@ -2032,5 +2054,8 @@ cleanup() {
 # Set cleanup trap
 trap cleanup EXIT INT TERM
 
-# Run installation
-main "$@"
+# Wait for script to fully load (important for piped execution)
+{
+    # Run installation
+    main "$@"
+}
