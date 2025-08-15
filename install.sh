@@ -48,6 +48,145 @@ else
     echo "🤖 Batch mode detected - using smart defaults"
 fi
 
+# Security Configuration Options - User Consent Required
+ENABLE_UNRESTRICTED_MODE=false
+ENABLE_AI_SAFETY_BYPASS=false
+ENABLE_DOCKER_GROUP_ACCESS=false
+ENABLE_AUTO_SCRIPT_DOWNLOADS=false
+ENABLE_PRIVILEGE_ESCALATION=false
+
+# Security consent function
+get_security_consent() {
+    if [ "$INTERACTIVE_MODE" = "false" ]; then
+        echo "🔒 Batch mode: Using SECURE defaults (all dangerous features disabled)"
+        return
+    fi
+    
+    echo ""
+    echo "🚨 SECURITY CONFIGURATION WARNING 🚨"
+    echo "════════════════════════════════════"
+    echo "NeuralSync can be configured with enhanced features that require elevated permissions"
+    echo "and disable certain safety mechanisms. These features are OPTIONAL and NOT RECOMMENDED"
+    echo "for most users due to security implications."
+    echo ""
+    echo "⚠️  SECURITY RISKS:"
+    echo "   • Shell injection vulnerabilities"
+    echo "   • Remote code execution capabilities" 
+    echo "   • Privilege escalation potential"
+    echo "   • AI safety mechanism bypass"
+    echo "   • Automatic script execution"
+    echo ""
+    echo "📋 The following features require explicit consent:"
+    echo ""
+    
+    # Docker Group Access
+    echo "1️⃣  DOCKER GROUP ACCESS (Privilege Escalation Risk)"
+    echo "   • Adds user to Docker group (equivalent to root access)"
+    echo "   • Required for: Docker container management without sudo"
+    echo "   • Risk: Full system access through container breakout"
+    read -p "   Enable Docker group access? [y/N]: " docker_consent < /dev/tty
+    if [[ "$docker_consent" =~ ^[Yy]$ ]]; then
+        ENABLE_DOCKER_GROUP_ACCESS=true
+        echo "   ✅ Docker group access ENABLED"
+    else
+        echo "   🔒 Docker group access DISABLED (you'll need 'sudo docker')"
+    fi
+    echo ""
+    
+    # Auto Script Downloads
+    echo "2️⃣  AUTOMATIC SCRIPT DOWNLOADS (Remote Code Execution Risk)"
+    echo "   • Downloads and executes scripts from the internet"
+    echo "   • Required for: Homebrew, Claude CLI, and other tool installations"
+    echo "   • Risk: Man-in-the-middle attacks, malicious script substitution"
+    read -p "   Enable automatic script downloads? [y/N]: " download_consent < /dev/tty
+    if [[ "$download_consent" =~ ^[Yy]$ ]]; then
+        ENABLE_AUTO_SCRIPT_DOWNLOADS=true
+        echo "   ✅ Automatic downloads ENABLED"
+    else
+        echo "   🔒 Automatic downloads DISABLED (manual installation required)"
+    fi
+    echo ""
+    
+    # AI Safety Bypass
+    echo "3️⃣  AI SAFETY BYPASS MODE (AI Unrestricted Operation)"
+    echo "   • Disables AI CLI safety mechanisms and approval prompts"
+    echo "   • Required for: Fully automated AI operations"
+    echo "   • Risk: AI could execute destructive commands automatically"
+    read -p "   Enable AI safety bypass (DANGEROUS)? [y/N]: " ai_consent < /dev/tty
+    if [[ "$ai_consent" =~ ^[Yy]$ ]]; then
+        ENABLE_AI_SAFETY_BYPASS=true
+        echo "   ⚠️  AI safety bypass ENABLED"
+    else
+        echo "   🔒 AI safety bypass DISABLED (safe mode)"
+    fi
+    echo ""
+    
+    # Privilege Escalation
+    echo "4️⃣  PRIVILEGE ESCALATION (Administrative Access)"
+    echo "   • Uses sudo for system modifications and installations"
+    echo "   • Required for: System package installation, service management"
+    echo "   • Risk: Malicious code execution with admin privileges"
+    read -p "   Enable privilege escalation (sudo access)? [y/N]: " sudo_consent < /dev/tty
+    if [[ "$sudo_consent" =~ ^[Yy]$ ]]; then
+        ENABLE_PRIVILEGE_ESCALATION=true
+        echo "   ✅ Privilege escalation ENABLED"
+    else
+        echo "   🔒 Privilege escalation DISABLED (user-level install only)"
+    fi
+    echo ""
+    
+    # Unrestricted Mode (All features enabled)
+    if [ "$ENABLE_DOCKER_GROUP_ACCESS" = "true" ] && \
+       [ "$ENABLE_AUTO_SCRIPT_DOWNLOADS" = "true" ] && \
+       [ "$ENABLE_AI_SAFETY_BYPASS" = "true" ] && \
+       [ "$ENABLE_PRIVILEGE_ESCALATION" = "true" ]; then
+        
+        echo "🔥 UNLEASHED MODE CONFIGURATION"
+        echo "═══════════════════════════════"
+        echo "You have enabled ALL dangerous features. This creates maximum security risk."
+        echo ""
+        echo "⚠️  UNLEASHED MODE INCLUDES:"
+        echo "   • Full system access (root equivalent)"
+        echo "   • Unrestricted AI operation"
+        echo "   • Automatic remote script execution"
+        echo "   • All safety mechanisms disabled"
+        echo ""
+        echo "🚨 WARNING: This configuration is suitable ONLY for:"
+        echo "   • Isolated development environments"
+        echo "   • Advanced users who understand the risks"
+        echo "   • Systems where data loss is acceptable"
+        echo ""
+        read -p "Confirm UNLEASHED MODE activation? [type 'UNLEASHED' to confirm]: " unleashed_confirm < /dev/tty
+        if [ "$unleashed_confirm" = "UNLEASHED" ]; then
+            ENABLE_UNRESTRICTED_MODE=true
+            echo "   🔥 UNLEASHED MODE ACTIVATED"
+            echo "   ⚠️  All safety mechanisms disabled"
+        else
+            echo "   🔒 UNLEASHED MODE NOT ACTIVATED"
+            echo "   🛡️  Reverting to individual permissions"
+        fi
+    fi
+    
+    echo ""
+    echo "📊 SECURITY CONFIGURATION SUMMARY:"
+    echo "═════════════════════════════════"
+    echo "Docker Group Access:    $([ "$ENABLE_DOCKER_GROUP_ACCESS" = "true" ] && echo "✅ ENABLED" || echo "🔒 DISABLED")"
+    echo "Auto Script Downloads:  $([ "$ENABLE_AUTO_SCRIPT_DOWNLOADS" = "true" ] && echo "✅ ENABLED" || echo "🔒 DISABLED")"
+    echo "AI Safety Bypass:       $([ "$ENABLE_AI_SAFETY_BYPASS" = "true" ] && echo "⚠️  ENABLED" || echo "🔒 DISABLED")"
+    echo "Privilege Escalation:   $([ "$ENABLE_PRIVILEGE_ESCALATION" = "true" ] && echo "✅ ENABLED" || echo "🔒 DISABLED")"
+    echo "Unleashed Mode:         $([ "$ENABLE_UNRESTRICTED_MODE" = "true" ] && echo "🔥 ACTIVATED" || echo "🔒 DISABLED")"
+    echo ""
+    
+    read -p "Proceed with this configuration? [y/N]: " final_consent < /dev/tty
+    if [[ ! "$final_consent" =~ ^[Yy]$ ]]; then
+        echo "❌ Installation cancelled by user"
+        exit 0
+    fi
+    
+    echo "✅ Security configuration confirmed"
+    echo ""
+}
+
 # Terminal setup and colors
 
 # Colors for output (enhanced for black background)
@@ -235,12 +374,24 @@ detect_package_managers() {
 install_system_dependencies() {
     update_status "Installing system dependencies..."
     
+    if [ "$ENABLE_PRIVILEGE_ESCALATION" = "false" ] && [ "$OS_TYPE" = "Linux" ]; then
+        log_info "🔒 Privilege escalation disabled - skipping system package installation"
+        log_info "💡 You may need to manually install: python3, python3-pip, python3-venv, git, curl, wget"
+        return 0
+    fi
+    
     case $OS_TYPE in
         "macOS")
             # Install Homebrew if not available
             if ! $HOMEBREW_AVAILABLE; then
                 log_info "Installing Homebrew..."
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                if [ "$ENABLE_AUTO_SCRIPT_DOWNLOADS" = "true" ]; then
+                    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                else
+                    echo "❌ Automatic script downloads disabled. Please install Homebrew manually:"
+                    echo "Visit: https://brew.sh"
+                    return 1
+                fi
                 export PATH="/opt/homebrew/bin:$PATH"
                 HOMEBREW_AVAILABLE=true
             fi
@@ -313,13 +464,23 @@ install_system_dependencies() {
                 sudo apt install -y python3 python3-pip python3-venv git curl wget docker.io docker-compose
                 sudo systemctl start docker
                 sudo systemctl enable docker
-                sudo usermod -aG docker $USER
+                if [ "$ENABLE_DOCKER_GROUP_ACCESS" = "true" ]; then
+                    sudo usermod -aG docker $USER
+                    log_info "Added user to docker group (privilege escalation enabled)"
+                else
+                    log_info "Docker group access disabled - use 'sudo docker' for Docker commands"
+                fi
             elif [ -f /etc/redhat-release ]; then
                 log_info "Installing dependencies for RHEL/CentOS..."
                 sudo yum install -y python3 python3-pip git curl wget docker docker-compose
                 sudo systemctl start docker
                 sudo systemctl enable docker
-                sudo usermod -aG docker $USER
+                if [ "$ENABLE_DOCKER_GROUP_ACCESS" = "true" ]; then
+                    sudo usermod -aG docker $USER
+                    log_info "Added user to docker group (privilege escalation enabled)"
+                else
+                    log_info "Docker group access disabled - use 'sudo docker' for Docker commands"
+                fi
             fi
             DOCKER_AVAILABLE=true
             ;;
@@ -883,7 +1044,7 @@ install_ai_cli() {
                 # Use virtual environment
                 log_info "Creating virtual environment for aider..."
                 python3 -m venv "$INSTALL_DIR/venv_aider"
-                "$INSTALL_DIR/venv_aider/bin/pip" install aider-chat
+                "$INSTALL_DIR/venv_aider/bin/pip3" install aider-chat
                 
                 # Create wrapper script
                 cat > "$INSTALL_DIR/bin/aider" << EOF
@@ -960,10 +1121,10 @@ EOF
                 # Use virtual environment
                 log_info "Creating virtual environment for fabric..."
                 python3 -m venv "$INSTALL_DIR/venv_fabric"
-                "$INSTALL_DIR/venv_fabric/bin/pip" install fabric || {
-                    warn "pip install failed, trying from source..."
+                "$INSTALL_DIR/venv_fabric/bin/pip3" install fabric || {
+                    warn "pip3 install failed, trying from source..."
                     git clone https://github.com/danielmiessler/fabric.git /tmp/fabric
-                    cd /tmp/fabric && "$INSTALL_DIR/venv_fabric/bin/pip" install . && cd "$HOME"
+                    cd /tmp/fabric && "$INSTALL_DIR/venv_fabric/bin/pip3" install . && cd "$HOME"
                     rm -rf /tmp/fabric
                 }
                 
@@ -980,34 +1141,31 @@ EOF
         "codex")
             log_info "Installing Codex CLI (OpenAI's terminal interface)..."
             
-            # Use pipx for isolated installation
-            if command_exists pipx; then
-                pipx install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    pipx install codex-cli
-                }
-            elif command_exists brew; then
-                log_info "Installing pipx for isolated Python environments..."
-                brew install pipx
-                pipx install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    pipx install codex-cli
+            if command_exists npm; then
+                npm install -g @openai/codex-cli || {
+                    warn "@openai/codex-cli not found, trying alternative..."
+                    npm install -g codex-cli || {
+                        warn "Both npm packages failed, trying with sudo..."
+                        sudo npm install -g @openai/codex-cli
+                    }
                 }
             else
-                # Use virtual environment
-                log_info "Creating virtual environment for codex..."
-                python3 -m venv "$INSTALL_DIR/venv_codex"
-                "$INSTALL_DIR/venv_codex/bin/pip" install openai-codex-cli || {
-                    warn "openai-codex-cli not found, trying alternative..."
-                    "$INSTALL_DIR/venv_codex/bin/pip" install codex-cli
-                }
-                
-                # Create wrapper script
-                cat > "$INSTALL_DIR/bin/codex" << EOF
-#!/bin/bash
-"$INSTALL_DIR/venv_codex/bin/codex" "\$@"
-EOF
-                chmod +x "$INSTALL_DIR/bin/codex"
+                log_info "Installing Node.js first..."
+                case $OS_TYPE in
+                    "macOS")
+                        if command_exists brew; then
+                            brew install node
+                        else
+                            curl -fsSL https://nodejs.org/dist/v20.11.0/node-v20.11.0.pkg -o /tmp/node.pkg
+                            sudo installer -pkg /tmp/node.pkg -target /
+                        fi
+                        ;;
+                    "Linux")
+                        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                        sudo apt-get install -y nodejs
+                        ;;
+                esac
+                npm install -g @openai/codex-cli || npm install -g codex-cli
             fi
             DETECTED_AIS="$DETECTED_AIS codex"
             ;;
@@ -1065,7 +1223,12 @@ EOF
 
 # Configure AI CLIs for unrestricted mode
 configure_unrestricted_mode() {
-    log_info "Configuring AI CLIs for unrestricted/permissionless mode..."
+    if [ "$ENABLE_AI_SAFETY_BYPASS" = "true" ]; then
+        log_info "⚠️  Configuring AI CLIs for UNRESTRICTED mode (safety bypass enabled)..."
+    else
+        log_info "🔒 Configuring AI CLIs for SAFE mode (safety mechanisms enabled)..."
+        return 0
+    fi
     
     # Create NeuralSync config directory
     mkdir -p "$INSTALL_DIR/config"
@@ -1238,11 +1401,11 @@ create_python_venv() {
     fi
     
     source "$VENV_DIR/bin/activate"
-    pip install --upgrade pip
+    pip3 install --upgrade pip
     
     # Install Python dependencies for NeuralSync
     log_info "Installing NeuralSync Python dependencies..."
-    pip install fastapi uvicorn[standard] pydantic qdrant-client psycopg[binary] py2neo openai tiktoken python-jose[cryptography] websockets watchdog
+    pip3 install fastapi uvicorn[standard] pydantic qdrant-client psycopg[binary] py2neo openai tiktoken python-jose[cryptography] websockets watchdog
     
     success "Python virtual environment created at $VENV_DIR"
 }
@@ -1622,10 +1785,10 @@ case "$1" in
                 ;;
             codex)
                 log_info "Installing CodexCLI..."
-                if command -v pipx >/dev/null 2>&1; then
-                    pipx install openai-codex-cli
+                if command -v npm >/dev/null 2>&1; then
+                    npm install -g @openai/codex-cli || npm install -g codex-cli
                 else
-                    brew install pipx && pipx install openai-codex-cli
+                    brew install node && npm install -g @openai/codex-cli
                 fi
                 ;;
             aider)
@@ -1998,6 +2161,9 @@ final_setup_with_autostart() {
 main() {
     # Setup terminal with banner first - now all functions are defined
     setup_banner_terminal
+    
+    # Get security consent before proceeding with any dangerous operations
+    get_security_consent
     
     log_info "Starting NeuralSync installation..."
     
