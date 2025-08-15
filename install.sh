@@ -99,11 +99,11 @@ setup_banner_terminal() {
         # Position cursor at start of scroll region
         printf '\033[%d;1H' $((BANNER_HEIGHT + 1))
         
-        log "Using scroll region method for banner preservation"
+        log_info "Using scroll region method for banner preservation"
     else
         # Fallback: just show banner normally
         show_banner
-        log "Terminal doesn't support scroll regions - using simple banner display"
+        log_info "Terminal doesn't support scroll regions - using simple banner display"
     fi
 }
 
@@ -166,19 +166,19 @@ update_status() {
 }
 
 # Simple logging functions
-log() {
+log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-warn() {
+log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
-error() {
+log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-success() {
+log_success() {
     echo -e "${PURPLE}[SUCCESS]${NC} $1"
 }
 
@@ -192,7 +192,7 @@ detect_os() {
         MINGW*)     OS_TYPE="Windows";;
         *)          OS_TYPE="Unknown";;
     esac
-    log "Detected OS: $OS_TYPE"
+    log_info "Detected OS: $OS_TYPE"
 }
 
 # Check if command exists
@@ -202,16 +202,16 @@ command_exists() {
 
 # Detect available package managers
 detect_package_managers() {
-    log "Detecting package managers..."
+    log_info "Detecting package managers..."
     
     if command_exists brew; then
         HOMEBREW_AVAILABLE=true
-        log "Homebrew detected"
+        log_info "Homebrew detected"
     fi
     
     if command_exists docker; then
         DOCKER_AVAILABLE=true
-        log "Docker detected"
+        log_info "Docker detected"
     fi
 }
 
@@ -223,7 +223,7 @@ install_system_dependencies() {
         "macOS")
             # Install Homebrew if not available
             if ! $HOMEBREW_AVAILABLE; then
-                log "Installing Homebrew..."
+                log_info "Installing Homebrew..."
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
                 export PATH="/opt/homebrew/bin:$PATH"
                 HOMEBREW_AVAILABLE=true
@@ -233,14 +233,14 @@ install_system_dependencies() {
             if ! $DOCKER_AVAILABLE; then
                 # Check if Docker Desktop is installed but not running
                 if [ -d "/Applications/Docker.app" ]; then
-                    log "Docker Desktop found but not running. Starting Docker..."
+                    log_info "Docker Desktop found but not running. Starting Docker..."
                     open -a Docker
                 else
-                    log "Installing Docker Desktop..."
+                    log_info "Installing Docker Desktop..."
                     brew install --cask docker
                     
                     # Automatically launch Docker Desktop after installation
-                    log "Launching Docker Desktop..."
+                    log_info "Launching Docker Desktop..."
                     open -a Docker
                 fi
                 
@@ -292,14 +292,14 @@ install_system_dependencies() {
         "Linux")
             # Detect Linux distribution
             if [ -f /etc/debian_version ]; then
-                log "Installing dependencies for Debian/Ubuntu..."
+                log_info "Installing dependencies for Debian/Ubuntu..."
                 sudo apt update
                 sudo apt install -y python3 python3-pip python3-venv git curl wget docker.io docker-compose
                 sudo systemctl start docker
                 sudo systemctl enable docker
                 sudo usermod -aG docker $USER
             elif [ -f /etc/redhat-release ]; then
-                log "Installing dependencies for RHEL/CentOS..."
+                log_info "Installing dependencies for RHEL/CentOS..."
                 sudo yum install -y python3 python3-pip git curl wget docker docker-compose
                 sudo systemctl start docker
                 sudo systemctl enable docker
@@ -332,7 +332,7 @@ get_user_preferences() {
         if [ -z "$USER_NAME" ]; then
             USER_NAME="User"
         fi
-        log "Hello $USER_NAME! Setting up personalized AI experience..."
+        log_info "Hello $USER_NAME! Setting up personalized AI experience..."
         echo ""
         
         # NeuralSync admin credentials
@@ -361,8 +361,8 @@ get_user_preferences() {
         USER_NAME="User"
         NEURALSYNC_ADMIN_USER="admin"
         NEURALSYNC_ADMIN_PASS="neuralsync123"
-        log "Hello $USER_NAME! Setting up personalized AI experience with defaults..."
-        log "Default admin account: $NEURALSYNC_ADMIN_USER (password: neuralsync123)"
+        log_info "Hello $USER_NAME! Setting up personalized AI experience with defaults..."
+        log_info "Default admin account: $NEURALSYNC_ADMIN_USER (password: neuralsync123)"
         echo ""
     fi
     
@@ -379,21 +379,21 @@ get_user_preferences() {
         read -p "Select sync mode (1-3, default: 3): " sync_mode < /dev/tty
     else
         sync_mode=3
-        log "Using default sync mode: Hybrid"
+        log_info "Using default sync mode: Hybrid"
     fi
     
     case ${sync_mode:-3} in
         1)
             NEURALSYNC_SYNC_MODE="realtime"
-            log "Real-time sync mode selected - memories sync continuously"
+            log_info "Real-time sync mode selected - memories sync continuously"
             ;;
         2)
             NEURALSYNC_SYNC_MODE="handoff"
-            log "Manual handoff mode selected - memories transfer via export/import"
+            log_info "Manual handoff mode selected - memories transfer via export/import"
             ;;
         *)
             NEURALSYNC_SYNC_MODE="hybrid"
-            log "Hybrid mode selected - both real-time sync and handoff available"
+            log_info "Hybrid mode selected - both real-time sync and handoff available"
             ;;
     esac
     echo ""
@@ -410,7 +410,7 @@ get_user_preferences() {
         read -p "Do you want to configure NAS storage? (y/N): " configure_nas < /dev/tty
     else
         configure_nas="n"
-        log "Skipping NAS configuration in piped mode"
+        log_info "Skipping NAS configuration in piped mode"
     fi
     if [[ $configure_nas =~ ^[Yy]$ ]]; then
         echo ""
@@ -422,7 +422,7 @@ get_user_preferences() {
             read -p "Enter choice (1-2): " nas_choice < /dev/tty
         else
             nas_choice=1
-            log "Using default NAS method: mount point"
+            log_info "Using default NAS method: mount point"
         fi
         
         case $nas_choice in
@@ -436,7 +436,7 @@ get_user_preferences() {
                     fi
                 else
                     NAS_MOUNT_POINT="/Volumes/NAS"
-                    log "Default NAS mount point: $NAS_MOUNT_POINT (configure later if needed)"
+                    log_info "Default NAS mount point: $NAS_MOUNT_POINT (configure later if needed)"
                 fi
                 ;;
             2)
@@ -447,12 +447,12 @@ get_user_preferences() {
                     echo ""
                     success "NAS credentials configured for $NAS_IP"
                 else
-                    log "NAS IP configuration requires interactive mode - skipping"
+                    log_info "NAS IP configuration requires interactive mode - skipping"
                 fi
                 ;;
         esac
     else
-        log "Skipping NAS configuration (can be added later)"
+        log_info "Skipping NAS configuration (can be added later)"
     fi
     echo ""
     
@@ -473,13 +473,13 @@ get_user_preferences() {
         read -p "Scan and compile AI configuration files? (y/N): " scan_consent < /dev/tty
         if [[ $scan_consent =~ ^[Yy]$ ]]; then
             SCAN_AI_CONFIGS=true
-            log "Will scan for AI configuration files"
+            log_info "Will scan for AI configuration files"
         else
-            log "Skipping AI config file scanning"
+            log_info "Skipping AI config file scanning"
         fi
     else
         SCAN_AI_CONFIGS=true
-        log "Auto-enabling AI config scanning in piped mode"
+        log_info "Auto-enabling AI config scanning in piped mode"
     fi
     echo ""
 }
@@ -491,7 +491,7 @@ scan_ai_configurations() {
         return
     fi
     
-    log "Scanning filesystem for AI configuration files..."
+    log_info "Scanning filesystem for AI configuration files..."
     
     # Define common AI config file patterns
     local config_patterns=(
@@ -533,7 +533,7 @@ scan_ai_configurations() {
     for pattern in "${config_patterns[@]}"; do
         if [ -f "$pattern" ] || [ -d "$pattern" ]; then
             AI_CONFIG_FILES="$AI_CONFIG_FILES\n$pattern"
-            log "Found: $pattern"
+            log_info "Found: $pattern"
         fi
     done
     
@@ -544,7 +544,7 @@ scan_ai_configurations() {
             for pattern in "${project_patterns[@]}"; do
                 find "$dev_dir" -name "$pattern" -type f 2>/dev/null | while read -r file; do
                     AI_CONFIG_FILES="$AI_CONFIG_FILES\n$file"
-                    log "Found project config: $file"
+                    log_info "Found project config: $file"
                 done
             done
         fi
@@ -557,7 +557,7 @@ scan_ai_configurations() {
             for pattern in "${project_patterns[@]}"; do
                 if [ -f "$current_dir/$pattern" ]; then
                     AI_CONFIG_FILES="$AI_CONFIG_FILES\n$current_dir/$pattern"
-                    log "Found git project config: $current_dir/$pattern"
+                    log_info "Found git project config: $current_dir/$pattern"
                 fi
             done
             break
@@ -579,7 +579,7 @@ compile_base_memory() {
         return
     fi
     
-    log "Compiling AI configurations into base memory system..."
+    log_info "Compiling AI configurations into base memory system..."
     
     local base_memory_file="$INSTALL_DIR/config/base_memory.md"
     local prime_directive_file="$INSTALL_DIR/config/prime_directive.md"
@@ -618,7 +618,7 @@ EOF
     # Process each found configuration file
     echo -e "$AI_CONFIG_FILES" | while read -r config_file; do
         if [ -f "$config_file" ] && [ -s "$config_file" ]; then
-            log "Processing: $config_file"
+            log_info "Processing: $config_file"
             
             echo "### Configuration from: \`$config_file\`" >> "$base_memory_file"
             echo "" >> "$base_memory_file"
@@ -659,8 +659,8 @@ When working with other AIs in the NeuralSync network:
 EOF
     
     success "Base memory system compiled with user configurations"
-    log "Base memory: $base_memory_file"
-    log "Prime directive: $prime_directive_file"
+    log_info "Base memory: $base_memory_file"
+    log_info "Prime directive: $prime_directive_file"
 }
 
 # Detect available AI CLIs
@@ -671,55 +671,55 @@ detect_ai_clis() {
     # Claude Code
     if command_exists claude; then
         DETECTED_AIS="$DETECTED_AIS claude-code"
-        log "✓ Claude Code detected"
+        log_info "✓ Claude Code detected"
     fi
     
     # Aider - Terminal warrior's dream, top SWE Bench score
     if command_exists aider; then
         DETECTED_AIS="$DETECTED_AIS aider"
-        log "✓ Aider CLI detected"
+        log_info "✓ Aider CLI detected"
     fi
     
     # Gemini CLI - Google's open-source terminal agent
     if command_exists gemini; then
         DETECTED_AIS="$DETECTED_AIS gemini"
-        log "✓ Gemini CLI detected"
+        log_info "✓ Gemini CLI detected"
     fi
     
     # Warp - Agentic development environment terminal
     if command_exists warp; then
         DETECTED_AIS="$DETECTED_AIS warp"
-        log "✓ Warp terminal detected"
+        log_info "✓ Warp terminal detected"
     fi
     
     # Fabric - Open-source AI augmentation framework
     if command_exists fabric; then
         DETECTED_AIS="$DETECTED_AIS fabric"
-        log "✓ Fabric CLI detected"
+        log_info "✓ Fabric CLI detected"
     fi
     
     # CodexCLI - OpenAI's terminal interface
     if command_exists codex || command_exists codes; then
         DETECTED_AIS="$DETECTED_AIS codex"
-        log "✓ Codex CLI detected"
+        log_info "✓ Codex CLI detected"
     fi
     
     # Ollama - Run AI models locally
     if command_exists ollama; then
         DETECTED_AIS="$DETECTED_AIS ollama"
-        log "✓ Ollama detected"
+        log_info "✓ Ollama detected"
     fi
     
     # Autopilot CLI (GitHub Copilot)
     if command_exists autopilot || command_exists github-copilot-cli || command_exists gh-copilot; then
         DETECTED_AIS="$DETECTED_AIS autopilot"
-        log "✓ GitHub Copilot CLI detected"
+        log_info "✓ GitHub Copilot CLI detected"
     fi
     
     # GPT-5 Planner (ChatBot)
     if command_exists chatgpt || command_exists gpt || command_exists openai-chat; then
         DETECTED_AIS="$DETECTED_AIS gpt5-planner"
-        log "✓ GPT-5 Planner (ChatBot) detected"
+        log_info "✓ GPT-5 Planner (ChatBot) detected"
     fi
     
     if [ -z "$DETECTED_AIS" ]; then
@@ -733,7 +733,7 @@ detect_ai_clis() {
 install_missing_ai_clis() {
     update_status "Installing AI CLIs..."
     if [ ! -z "$DETECTED_AIS" ]; then
-        log "Found existing AI CLIs: $DETECTED_AIS"
+        log_info "Found existing AI CLIs: $DETECTED_AIS"
         echo ""
     fi
     
@@ -771,7 +771,7 @@ install_missing_ai_clis() {
                     install_choices="$install_choices $tool"
                     success "✓ $tool selected for installation"
                 else
-                    log "Skipped $tool"
+                    log_info "Skipped $tool"
                 fi
                 echo ""
             fi
@@ -784,7 +784,7 @@ install_missing_ai_clis() {
             
             # Check if Claude Code is already installed
             if echo "$DETECTED_AIS" | grep -q "claude-code"; then
-                log "Claude Code is already installed and detected"
+                log_info "Claude Code is already installed and detected"
             else
                 read -p "Install recommended Claude Code? (Y/n): " default_choice < /dev/tty
                 if [[ ! $default_choice =~ ^[Nn]$ ]]; then
@@ -794,19 +794,19 @@ install_missing_ai_clis() {
         fi
     else
         # Piped mode - install essential free tools
-        log "Running in piped mode - installing essential free AI CLIs..."
+        log_info "Running in piped mode - installing essential free AI CLIs..."
         for tool in claude-code aider gemini warp fabric codex ollama; do
             if ! echo "$DETECTED_AIS" | grep -q "$tool"; then
                 case $tool in
                     "gemini"|"aider"|"ollama"|"fabric")
                         # Install free tools automatically
                         install_choices="$install_choices $tool"
-                        log "✓ Auto-selected $tool (free tool)"
+                        log_info "✓ Auto-selected $tool (free tool)"
                         ;;
                     "claude-code")
                         # Install Claude Code as primary tool
                         install_choices="$install_choices $tool"
-                        log "✓ Auto-selected $tool (primary CLI)"
+                        log_info "✓ Auto-selected $tool (primary CLI)"
                         ;;
                 esac
             fi
@@ -816,7 +816,7 @@ install_missing_ai_clis() {
     # Install selected AI CLIs
     if [ ! -z "$install_choices" ]; then
         echo ""
-        log "Installing selected AI CLIs: $install_choices"
+        log_info "Installing selected AI CLIs: $install_choices"
         
         for tool in $install_choices; do
             install_ai_cli "$tool"
@@ -830,7 +830,7 @@ install_ai_cli() {
     
     case "$tool" in
         "claude-code")
-            log "Installing Claude Code..."
+            log_info "Installing Claude Code..."
             case $OS_TYPE in
                 "macOS")
                     if command_exists npm; then
@@ -850,18 +850,18 @@ install_ai_cli() {
             ;;
             
         "aider")
-            log "Installing Aider (Terminal warrior's dream)..."
+            log_info "Installing Aider (Terminal warrior's dream)..."
             
             # Use pipx for isolated installation
             if command_exists pipx; then
                 pipx install aider-chat
             elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
+                log_info "Installing pipx for isolated Python environments..."
                 brew install pipx
                 pipx install aider-chat
             else
                 # Use virtual environment
-                log "Creating virtual environment for aider..."
+                log_info "Creating virtual environment for aider..."
                 python3 -m venv "$INSTALL_DIR/venv_aider"
                 "$INSTALL_DIR/venv_aider/bin/pip" install aider-chat
                 
@@ -876,14 +876,14 @@ EOF
             ;;
             
         "gemini")
-            log "Installing Gemini CLI (Google's open-source terminal agent)..."
+            log_info "Installing Gemini CLI (Google's open-source terminal agent)..."
             if command_exists npm; then
                 npm install -g @google/gemini-cli || {
                     warn "Global npm install failed, trying without sudo..."
                     sudo npm install -g @google/gemini-cli
                 }
             else
-                log "Installing Node.js first..."
+                log_info "Installing Node.js first..."
                 case $OS_TYPE in
                     "macOS")
                         if command_exists brew; then
@@ -904,18 +904,18 @@ EOF
             ;;
             
         "warp")
-            log "Installing Warp (Agentic development environment)..."
+            log_info "Installing Warp (Agentic development environment)..."
             case $OS_TYPE in
                 "macOS")
                     if command_exists brew; then
                         brew install --cask warp || {
                             warn "brew install failed, downloading directly..."
                             curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
-                            log "Warp downloaded to /tmp/warp.dmg - please install manually"
+                            log_info "Warp downloaded to /tmp/warp.dmg - please install manually"
                         }
                     else
                         curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
-                        log "Warp downloaded to /tmp/warp.dmg - please install manually"
+                        log_info "Warp downloaded to /tmp/warp.dmg - please install manually"
                     fi
                     ;;
                 "Linux")
@@ -927,18 +927,18 @@ EOF
             ;;
             
         "fabric")
-            log "Installing Fabric (Open-source AI augmentation framework)..."
+            log_info "Installing Fabric (Open-source AI augmentation framework)..."
             
             # Use pipx for isolated installation
             if command_exists pipx; then
                 pipx install fabric
             elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
+                log_info "Installing pipx for isolated Python environments..."
                 brew install pipx
                 pipx install fabric
             else
                 # Use virtual environment
-                log "Creating virtual environment for fabric..."
+                log_info "Creating virtual environment for fabric..."
                 python3 -m venv "$INSTALL_DIR/venv_fabric"
                 "$INSTALL_DIR/venv_fabric/bin/pip" install fabric || {
                     warn "pip install failed, trying from source..."
@@ -958,7 +958,7 @@ EOF
             ;;
             
         "codex")
-            log "Installing Codex CLI (OpenAI's terminal interface)..."
+            log_info "Installing Codex CLI (OpenAI's terminal interface)..."
             
             # Use pipx for isolated installation
             if command_exists pipx; then
@@ -967,7 +967,7 @@ EOF
                     pipx install codex-cli
                 }
             elif command_exists brew; then
-                log "Installing pipx for isolated Python environments..."
+                log_info "Installing pipx for isolated Python environments..."
                 brew install pipx
                 pipx install openai-codex-cli || {
                     warn "openai-codex-cli not found, trying alternative..."
@@ -975,7 +975,7 @@ EOF
                 }
             else
                 # Use virtual environment
-                log "Creating virtual environment for codex..."
+                log_info "Creating virtual environment for codex..."
                 python3 -m venv "$INSTALL_DIR/venv_codex"
                 "$INSTALL_DIR/venv_codex/bin/pip" install openai-codex-cli || {
                     warn "openai-codex-cli not found, trying alternative..."
@@ -993,7 +993,7 @@ EOF
             ;;
             
         "ollama")
-            log "Installing Ollama (Run AI models locally)..."
+            log_info "Installing Ollama (Run AI models locally)..."
             case $OS_TYPE in
                 "macOS")
                     if command_exists brew; then
@@ -1008,12 +1008,12 @@ EOF
             esac
             
             # Start Ollama service
-            log "Starting Ollama service..."
+            log_info "Starting Ollama service..."
             ollama serve &
             sleep 5
             
             # Install a basic model
-            log "Installing Ollama model (llama2)..."
+            log_info "Installing Ollama model (llama2)..."
             ollama pull llama2 || warn "Failed to pull model - you can do this later with: ollama pull llama2"
             
             DETECTED_AIS="$DETECTED_AIS ollama"
@@ -1045,14 +1045,14 @@ EOF
 
 # Configure AI CLIs for unrestricted mode
 configure_unrestricted_mode() {
-    log "Configuring AI CLIs for unrestricted/permissionless mode..."
+    log_info "Configuring AI CLIs for unrestricted/permissionless mode..."
     
     # Create NeuralSync config directory
     mkdir -p "$INSTALL_DIR/config"
     
     # Configure Claude Code for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "claude-code"; then
-        log "Configuring Claude Code for unrestricted mode..."
+        log_info "Configuring Claude Code for unrestricted mode..."
         
         # Create Claude Code config
         mkdir -p "$HOME/.claude"
@@ -1096,7 +1096,7 @@ EOF
     
     # Configure CodexCLI for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "codexcli"; then
-        log "Configuring CodexCLI for unrestricted mode..."
+        log_info "Configuring CodexCLI for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/codex-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1110,7 +1110,7 @@ EOF
     
     # Configure Autopilot for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "autopilot"; then
-        log "Configuring Autopilot for unrestricted mode..."
+        log_info "Configuring Autopilot for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/autopilot-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1124,7 +1124,7 @@ EOF
     
     # Configure Aider for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "aider"; then
-        log "Configuring Aider for unrestricted mode..."
+        log_info "Configuring Aider for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/aider-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1139,7 +1139,7 @@ EOF
     
     # Configure Google AI CLI for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "gemini"; then
-        log "Configuring Google AI CLI for unrestricted mode..."
+        log_info "Configuring Google AI CLI for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/gemini-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1153,7 +1153,7 @@ EOF
     
     # Configure Warp for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "warp"; then
-        log "Configuring Warp for unrestricted mode..."
+        log_info "Configuring Warp for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/warp-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1167,7 +1167,7 @@ EOF
     
     # Configure Fabric for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "fabric"; then
-        log "Configuring Fabric for unrestricted mode..."
+        log_info "Configuring Fabric for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/fabric-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1181,7 +1181,7 @@ EOF
     
     # Configure Ollama for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "ollama"; then
-        log "Configuring Ollama for unrestricted mode..."
+        log_info "Configuring Ollama for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/ollama-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1195,7 +1195,7 @@ EOF
     
     # Configure GPT-5 Planner (ChatBot) for unrestricted mode
     if echo "$DETECTED_AIS" | grep -q "gpt5-planner"; then
-        log "Configuring GPT-5 Planner (ChatBot) for unrestricted mode..."
+        log_info "Configuring GPT-5 Planner (ChatBot) for unrestricted mode..."
         
         cat > "$INSTALL_DIR/bin/gpt5-planner-unrestricted" << 'EOF'
 #!/bin/bash
@@ -1211,7 +1211,7 @@ EOF
 # Create Python virtual environment
 create_python_venv() {
     update_status "Creating Python virtual environment..."
-    log "Creating isolated Python virtual environment for NeuralSync..."
+    log_info "Creating isolated Python virtual environment for NeuralSync..."
     
     if [ ! -d "$VENV_DIR" ]; then
         python3 -m venv "$VENV_DIR"
@@ -1221,7 +1221,7 @@ create_python_venv() {
     pip install --upgrade pip
     
     # Install Python dependencies for NeuralSync
-    log "Installing NeuralSync Python dependencies..."
+    log_info "Installing NeuralSync Python dependencies..."
     pip install fastapi uvicorn[standard] pydantic qdrant-client psycopg[binary] py2neo openai tiktoken python-jose[cryptography] websockets watchdog
     
     success "Python virtual environment created at $VENV_DIR"
@@ -1229,7 +1229,7 @@ create_python_venv() {
 
 # Create directory structure
 create_directory_structure() {
-    log "Creating NeuralSync directory structure..."
+    log_info "Creating NeuralSync directory structure..."
     
     mkdir -p "$INSTALL_DIR"/{bin,config,data,logs,agents,integrations}
     mkdir -p "$INSTALL_DIR/data"/{postgres,qdrant,neo4j,minio,api}
@@ -1243,10 +1243,10 @@ clone_and_setup_neuralsync() {
     
     # Check if we're already in a neuralsync directory or if files exist locally
     if [ -f "docker-compose.yml" ] && [ -d "services" ] && [ -d "bus" ]; then
-        log "Found local NeuralSync files, using existing installation..."
+        log_info "Found local NeuralSync files, using existing installation..."
         setup_local_files
     else
-        log "Cloning from GitHub repository..."
+        log_info "Cloning from GitHub repository..."
         
         # Create temporary directory for cloning
         local temp_dir="/tmp/neuralsync-install-$$"
@@ -1269,7 +1269,7 @@ clone_and_setup_neuralsync() {
 
 # Setup files from local directory (whether cloned or existing)
 setup_local_files() {
-    log "Setting up NeuralSync files..."
+    log_info "Setting up NeuralSync files..."
     
     # Copy current directory files to install directory
     cp -r ./services "$INSTALL_DIR/" 2>/dev/null || true
@@ -1292,7 +1292,7 @@ setup_local_files() {
 
 # Create comprehensive master launcher script
 create_master_launcher_script() {
-    log "Creating NeuralSync master control script..."
+    log_info "Creating NeuralSync master control script..."
     
     cat > "$INSTALL_DIR/bin/neuralsync" << 'EOF'
 #!/bin/bash
@@ -1330,7 +1330,7 @@ case "$1" in
         docker-compose up -d
         
         # Wait for services to be ready
-        log "Waiting for services to start..."
+        log_info "Waiting for services to start..."
         sleep 15
         
         # Verify API is running
@@ -1350,57 +1350,57 @@ case "$1" in
         docker-compose up -d
         
         # Wait for services
-        log "Waiting for core services..."
+        log_info "Waiting for core services..."
         sleep 20
         
         # Auto-launch detected AI agents in background
-        log "Auto-launching AI agents..."
+        log_info "Auto-launching AI agents..."
         
         # Launch Claude Code if available
         if command -v claude >/dev/null 2>&1; then
-            log "Starting Claude Code agent..."
+            log_info "Starting Claude Code agent..."
             nohup "$INSTALL_DIR/bin/claude-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/claude.pid"
         fi
         
         # Launch CodexCLI if available
         if command -v codex >/dev/null 2>&1 || command -v codes >/dev/null 2>&1; then
-            log "Starting CodexCLI agent..."
+            log_info "Starting CodexCLI agent..."
             nohup "$INSTALL_DIR/bin/codex-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/codex.pid"
         fi
         
         # Launch Aider if available
         if command -v aider >/dev/null 2>&1; then
-            log "Starting Aider agent..."
+            log_info "Starting Aider agent..."
             nohup "$INSTALL_DIR/bin/aider-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/aider.pid"
         fi
         
         # Launch Warp if available
         if command -v warp >/dev/null 2>&1; then
-            log "Starting Warp terminal..."
+            log_info "Starting Warp terminal..."
             nohup "$INSTALL_DIR/bin/warp-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/warp.pid"
         fi
         
         # Launch Fabric if available
         if command -v fabric >/dev/null 2>&1; then
-            log "Starting Fabric..."
+            log_info "Starting Fabric..."
             nohup "$INSTALL_DIR/bin/fabric-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/fabric.pid"
         fi
         
         # Launch Ollama if available
         if command -v ollama >/dev/null 2>&1; then
-            log "Starting Ollama..."
+            log_info "Starting Ollama..."
             nohup "$INSTALL_DIR/bin/ollama-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/ollama.pid"
         fi
         
         # Launch GPT-5 Planner (ChatBot) if available
         if command -v chatgpt >/dev/null 2>&1 || command -v gpt >/dev/null 2>&1; then
-            log "Starting GPT-5 Planner (ChatBot)..."
+            log_info "Starting GPT-5 Planner (ChatBot)..."
             nohup "$INSTALL_DIR/bin/gpt5-planner-unrestricted" >/dev/null 2>&1 &
             echo $! > "$INSTALL_DIR/data/gpt5-planner.pid"
         fi
@@ -1418,7 +1418,7 @@ case "$1" in
             if [ -f "$pidfile" ]; then
                 pid=$(cat "$pidfile" 2>/dev/null)
                 if [ ! -z "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                    log "Stopping AI agent (PID: $pid)"
+                    log_info "Stopping AI agent (PID: $pid)"
                     kill "$pid" 2>/dev/null || true
                 fi
                 rm -f "$pidfile"
@@ -1504,39 +1504,39 @@ case "$1" in
         shift
         case "$1" in
             claude) 
-                log "Launching Claude Code in unrestricted mode..."
+                log_info "Launching Claude Code in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/claude-unrestricted" "${@:2}"
                 ;;
             codex) 
-                log "Launching CodexCLI in unrestricted mode..."
+                log_info "Launching CodexCLI in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/codex-unrestricted" "${@:2}"
                 ;;
             autopilot) 
-                log "Launching Autopilot in unrestricted mode..."
+                log_info "Launching Autopilot in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/autopilot-unrestricted" "${@:2}"
                 ;;
             aider) 
-                log "Launching Aider in unrestricted mode..."
+                log_info "Launching Aider in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/aider-unrestricted" "${@:2}"
                 ;;
             gemini) 
-                log "Launching Gemini in unrestricted mode..."
+                log_info "Launching Gemini in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/gemini-unrestricted" "${@:2}"
                 ;;
             warp)
-                log "Launching Warp in unrestricted mode..."
+                log_info "Launching Warp in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/warp-unrestricted" "${@:2}"
                 ;;
             fabric)
-                log "Launching Fabric in unrestricted mode..."
+                log_info "Launching Fabric in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/fabric-unrestricted" "${@:2}"
                 ;;
             ollama)
-                log "Launching Ollama in unrestricted mode..."
+                log_info "Launching Ollama in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/ollama-unrestricted" "${@:2}"
                 ;;
             gpt5-planner|chatgpt|planner)
-                log "Launching GPT-5 Planner (ChatBot) in unrestricted mode..."
+                log_info "Launching GPT-5 Planner (ChatBot) in unrestricted mode..."
                 exec "$INSTALL_DIR/bin/gpt5-planner-unrestricted" "${@:2}"
                 ;;
             list)
@@ -1570,7 +1570,7 @@ case "$1" in
         ;;
         
     update)
-        log "Updating NeuralSync..."
+        log_info "Updating NeuralSync..."
         
         # Pull latest Docker images
         docker-compose pull
@@ -1585,7 +1585,7 @@ case "$1" in
             warn "Not a git repository. Manual update required."
         fi
         
-        log "Update complete. Restart services with: neuralsync restart"
+        log_info "Update complete. Restart services with: neuralsync restart"
         ;;
         
     install-cli)
@@ -1593,7 +1593,7 @@ case "$1" in
         shift
         case "$1" in
             claude)
-                log "Installing Claude Code..."
+                log_info "Installing Claude Code..."
                 if command -v npm >/dev/null 2>&1; then
                     npm install -g @anthropic/claude-cli
                 else
@@ -1601,7 +1601,7 @@ case "$1" in
                 fi
                 ;;
             codex)
-                log "Installing CodexCLI..."
+                log_info "Installing CodexCLI..."
                 if command -v pipx >/dev/null 2>&1; then
                     pipx install openai-codex-cli
                 else
@@ -1609,7 +1609,7 @@ case "$1" in
                 fi
                 ;;
             aider)
-                log "Installing Aider..."
+                log_info "Installing Aider..."
                 if command -v pipx >/dev/null 2>&1; then
                     pipx install aider-chat
                 else
@@ -1617,7 +1617,7 @@ case "$1" in
                 fi
                 ;;
             warp)
-                log "Installing Warp terminal..."
+                log_info "Installing Warp terminal..."
                 case "$OS_TYPE" in
                     "macOS")
                         brew install --cask warp || curl -o /tmp/warp.dmg https://releases.warp.dev/stable/v0.2024.12.17.08.02.stable_01/Warp.dmg
@@ -1628,7 +1628,7 @@ case "$1" in
                 esac
                 ;;
             fabric)
-                log "Installing Fabric..."
+                log_info "Installing Fabric..."
                 if command -v pipx >/dev/null 2>&1; then
                     pipx install fabric
                 else
@@ -1636,11 +1636,11 @@ case "$1" in
                 fi
                 ;;
             ollama)
-                log "Installing Ollama..."
+                log_info "Installing Ollama..."
                 curl -fsSL https://ollama.ai/install.sh | sh
                 ;;
             gpt5-planner|chatgpt)
-                log "Installing GPT-5 Planner (ChatBot)..."
+                log_info "Installing GPT-5 Planner (ChatBot)..."
                 if command -v pipx >/dev/null 2>&1; then
                     pipx install chatgpt-cli
                 else
@@ -1662,7 +1662,7 @@ case "$1" in
                 export_file="$INSTALL_DIR/data/handoff_${thread_id}.nsync"
                 
                 # Create handoff bundle
-                log "Creating handoff bundle: $export_file"
+                log_info "Creating handoff bundle: $export_file"
                 tar -czf "$export_file" \
                     "$INSTALL_DIR/data/api/" \
                     "$INSTALL_DIR/config/base_memory.md" \
@@ -1722,14 +1722,14 @@ case "$1" in
         shift
         case "$1" in
             enable)
-                log "Enabling real-time sync..."
+                log_info "Enabling real-time sync..."
                 sed -i.bak 's/NEURALSYNC_SYNC_MODE=.*/NEURALSYNC_SYNC_MODE="realtime"/' "$INSTALL_DIR/.env"
                 echo -e "${GREEN}✅ Real-time sync enabled${NC}"
                 echo "Restart services to apply: neuralsync restart"
                 ;;
                 
             disable)
-                log "Disabling real-time sync..."
+                log_info "Disabling real-time sync..."
                 sed -i.bak 's/NEURALSYNC_SYNC_MODE=.*/NEURALSYNC_SYNC_MODE="handoff"/' "$INSTALL_DIR/.env"
                 echo -e "${GREEN}✅ Real-time sync disabled (handoff mode only)${NC}"
                 echo "Restart services to apply: neuralsync restart"
@@ -1815,7 +1815,7 @@ EOF
 
 # Add to PATH
 setup_path() {
-    log "Setting up PATH..."
+    log_info "Setting up PATH..."
     
     # Add to bash profile
     if [ -f "$HOME/.bashrc" ]; then
@@ -1907,10 +1907,10 @@ EOF
         
         # If no AI tools detected, skip API key configuration
         if [ -z "$DETECTED_AIS" ]; then
-            log "No AI tools detected - skipping API key configuration"
+            log_info "No AI tools detected - skipping API key configuration"
         fi
     else
-        log "Skipping API key configuration in piped mode - configure later with: neuralsync config"
+        log_info "Skipping API key configuration in piped mode - configure later with: neuralsync config"
     fi
     
     success "Environment configured with personalized settings"
@@ -1923,7 +1923,7 @@ final_setup_with_autostart() {
     cd "$INSTALL_DIR"
     
     # Pull Docker images
-    log "Pulling Docker images..."
+    log_info "Pulling Docker images..."
     source "$VENV_DIR/bin/activate"
     docker-compose pull
     
@@ -1940,11 +1940,11 @@ final_setup_with_autostart() {
         read -p "Auto-start NeuralSync now? (Y/n): " auto_start < /dev/tty
     else
         auto_start="y"
-        log "Auto-starting NeuralSync in piped mode"
+        log_info "Auto-starting NeuralSync in piped mode"
     fi
     
     if [[ ! $auto_start =~ ^[Nn]$ ]]; then
-        log "Auto-starting NeuralSync with all detected AI agents..."
+        log_info "Auto-starting NeuralSync with all detected AI agents..."
         
         # Use the neuralsync command for auto-start
         "$INSTALL_DIR/bin/neuralsync" autostart
@@ -1960,10 +1960,10 @@ final_setup_with_autostart() {
         echo -e "  ${BLUE}neuralsync health${NC}      - Full system health check"
         
     else
-        log "Skipping auto-start. You can start manually with: neuralsync autostart"
+        log_info "Skipping auto-start. You can start manually with: neuralsync autostart"
         
         # Just test that we can pull images and basic setup works
-        log "Testing basic setup..."
+        log_info "Testing basic setup..."
         docker-compose up -d --no-deps postgres qdrant neo4j
         sleep 10
         docker-compose down
@@ -1976,7 +1976,7 @@ final_setup_with_autostart() {
 
 # Main installation flow
 main() {
-    log "Starting NeuralSync installation..."
+    log_info "Starting NeuralSync installation..."
     
     detect_os
     detect_package_managers
