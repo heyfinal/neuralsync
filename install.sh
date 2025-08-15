@@ -49,6 +49,23 @@ CYAN='\033[1;36m'
 WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
+# Simple logging functions (defined early for use in banner setup)
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_success() {
+    echo -e "${PURPLE}[SUCCESS]${NC} $1"
+}
+
 # Banner configuration
 BANNER_HEIGHT=15
 SUPPORTS_SCROLL_REGION=false
@@ -163,23 +180,6 @@ update_status() {
     
     echo -e "${CYAN}Progress: ${YELLOW}[$bar] ${WHITE}($CURRENT_STEP/$TOTAL_STEPS)${NC}"
     echo -e "${WHITE}Current: ${CYAN}$task${NC}"
-}
-
-# Simple logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_success() {
-    echo -e "${PURPLE}[SUCCESS]${NC} $1"
 }
 
 # Detect operating system
