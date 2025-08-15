@@ -1309,15 +1309,15 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log() {
+log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-warn() {
+log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
-error() {
+log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
